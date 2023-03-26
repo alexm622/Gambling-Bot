@@ -6,10 +6,14 @@ use serenity::prelude::*;
 
 use tracing::{trace, Level};
 use tracing_subscriber::{filter, fmt, prelude::*};
+
+pub mod commands;
 pub mod secrets;
 
+use commands::help::*;
+
 #[group]
-#[commands(ping)]
+#[commands(ping, help)]
 struct General;
 
 struct Handler;
@@ -18,9 +22,10 @@ struct Handler;
 impl EventHandler for Handler {}
 
 fn start_tracing() {
-    let filter = filter::Targets::default()
-        // Enable the `INFO` level for anything in `my_crate`
-        .with_target("gambling_bot", Level::TRACE);
+    //we just want trace on for my base crate and nothing else
+    let filter = filter::Targets::default().with_target("gambling_bot", Level::TRACE);
+
+    //create and register the logger
     tracing_subscriber::Registry::default()
         .with(fmt::layer())
         .with(filter)
@@ -37,8 +42,6 @@ async fn main() {
 
     //get the login token from file
     let key = secrets::get_secret("disc_api").await;
-
-    trace!("using token {}", key.value);
 
     let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;
     let mut client = Client::builder(key.value, intents)
