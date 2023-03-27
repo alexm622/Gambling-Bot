@@ -5,15 +5,19 @@ use serenity::model::prelude::{ChannelId, UserId};
 use serenity::{model::prelude::Message, prelude::Context};
 use tracing::info;
 
-const USAGE_GENERAL: &str = "the command is roulette <command> <args>\n the available commands are as follows:
-bet <bet> <amount>: place a <bet> on a color (red or black) or number (0-36) with <amount> greater than 10
-odds <space>: get the odds of landing on <space>
-table: view the bets currently on the table
-timer: how much time is left till betting is closed"
+const USAGE_GENERAL: &str =
+    "the command is roulette <command> <args>\n the available commands are as follows:
+        - bet <bet> <amount>: place a <bet> on a color (red or black)
+            or number (0-36) with <amount> greater than 10
+        - odds <space>: get the odds of landing on <space>
+        - table: view the bets currently on the table
+        - timer: how much time is left till betting is closed";
 
 const USAGE_ODDS: &str = "roulette odds <bet>";
 const USAGE_BET: &str =
-    " The command \"roulette\" must be in the specific format: (roulette <bet> <amount>)\n<bet>: must be a color (black or red) or a number (0-36)\n<amount>: the amount to bet, must be greater than 10";
+    " The command \"roulette\" must be in the specific format: (roulette <bet> <amount>)
+        <bet>: must be a color (black or red) ora number (0-36)
+        <amount>: the amount to bet, must be greater than 10";
 
 const INVALID_BET: &str = "Invalid value entered for <bet> \n";
 const INVALID_AMOUNT: &str = "Invalid value entered for <amount> \n";
@@ -21,6 +25,12 @@ const INVALID_COMMAND: &str = "Invalid value for <command>\n";
 
 #[command]
 pub async fn roulette(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let commands = vec![
+        String::from("odds"),
+        String::from("bet"),
+        String::from("table"),
+        String::from("timer"),
+    ];
     let command = match args.single::<String>() {
         Ok(v) => v,
         Err(_) => {
@@ -34,6 +44,16 @@ pub async fn roulette(ctx: &Context, msg: &Message, mut args: Args) -> CommandRe
         }
     };
 
+    if !commands.contains(&command) {
+        info!(
+            "registered incorrect command \"{}\" in channel_id {}",
+            msg.content, msg.channel_id
+        );
+        msg.reply(ctx, format!("{}{}", INVALID_COMMAND, USAGE_GENERAL))
+            .await?;
+        return Ok(());
+    }
+
     let bet = match args.single::<String>() {
         Ok(v) => v,
         Err(_) => {
@@ -41,7 +61,8 @@ pub async fn roulette(ctx: &Context, msg: &Message, mut args: Args) -> CommandRe
                 "registered incorrect command \"{}\" in channel_id {}",
                 msg.content, msg.channel_id
             );
-            msg.reply(ctx, format!("{}{}", INVALID_BET, USAGE_GENERAL)).await?;
+            msg.reply(ctx, format!("{}{}", INVALID_BET, USAGE_GENERAL))
+                .await?;
             return Ok(());
         }
     };
