@@ -54,6 +54,21 @@ pub async fn roulette(ctx: &Context, msg: &Message, mut args: Args) -> CommandRe
         return Ok(());
     }
 
+    let user_id = msg.author.id;
+    let channel_id = msg.channel_id;
+
+    match command.to_lowercase().as_str() {
+        "bet" => make_bet(ctx, msg, args, &user_id).await,
+        "odds" => odds(ctx, msg, args, &user_id).await,
+        "table" => table(ctx, msg, &channel_id, &user_id).await,
+        &_ => {
+            msg.reply(ctx, "something went wrong").await?;
+            return Ok(());
+        }
+    }
+}
+
+async fn make_bet(ctx: &Context, msg: &Message, mut args: Args, user_id: &UserId) -> CommandResult {
     let bet = match args.single::<String>() {
         Ok(v) => v,
         Err(_) => {
@@ -66,6 +81,7 @@ pub async fn roulette(ctx: &Context, msg: &Message, mut args: Args) -> CommandRe
             return Ok(());
         }
     };
+
     let amount = match args.single::<u32>() {
         Ok(v) => v,
         Err(_) => {
@@ -79,25 +95,37 @@ pub async fn roulette(ctx: &Context, msg: &Message, mut args: Args) -> CommandRe
         }
     };
 
-    info!(
-        "registered command \"{}\" with bet on \"{}\" of amount {}",
-        command, bet, amount
-    );
+    info!("placed bet of {},{} for userId {}", bet, amount, user_id);
     Ok(())
 }
 
-async fn make_bet(user_id: &UserId, bet: &str, amount: u32) {
-    info!("placed bet of {},{} for userId {}", bet, amount, user_id);
-}
+async fn odds(ctx: &Context, msg: &Message, mut args: Args, user_id: &UserId) -> CommandResult {
+    let bet = match args.single::<String>() {
+        Ok(v) => v,
+        Err(_) => {
+            info!(
+                "registered incorrect command \"{}\" in channel_id {}",
+                msg.content, msg.channel_id
+            );
+            msg.reply(ctx, format!("{}{}", INVALID_BET, USAGE_GENERAL))
+                .await?;
+            return Ok(());
+        }
+    };
 
-async fn odds(ctx: &Context, msg: &Message, bet: &str, user_id: &UserId) -> CommandResult {
     info!("request for odds on bet {} by userId {}", bet, user_id);
     Ok(())
 }
 
-async fn table(ctx: &Context, msg: &Message, channel_id: ChannelId, user_id: &UserId) {
+async fn table(
+    ctx: &Context,
+    msg: &Message,
+    channel_id: &ChannelId,
+    user_id: &UserId,
+) -> CommandResult {
     info!(
         "requesting information on table in channel {} by userId {}",
         channel_id, user_id
     );
+    Ok(())
 }
