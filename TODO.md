@@ -4,7 +4,12 @@
 - gambling
   - blackjack
   - poker
-  - roulette
+  - roulette (WIP)
+    - comments
+    - subcommands
+    - global and local tables
+    - betting opening and closing
+    - embed animation
   - slots
 - individual banks/scores
 - chip trading
