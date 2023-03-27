@@ -11,9 +11,10 @@ pub mod commands;
 pub mod secrets;
 
 use commands::help::*;
+use commands::roulette::*;
 
 #[group]
-#[commands(ping, help)]
+#[commands(ping, help, roulette)]
 struct General;
 
 struct Handler;
