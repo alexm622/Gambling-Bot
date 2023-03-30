@@ -1,14 +1,20 @@
+use std::process::exit;
+
 use serenity::async_trait;
 use serenity::framework::standard::macros::{command, group};
 use serenity::framework::standard::{CommandResult, StandardFramework};
 use serenity::model::channel::Message;
 use serenity::prelude::*;
 
-use tracing::{trace, Level};
+use sql::test_connection;
+use tracing::log::error;
+use tracing::log::warn;
+use tracing::{info, trace, Level};
 use tracing_subscriber::{filter, fmt, prelude::*};
 
 pub mod commands;
 pub mod secrets;
+pub mod sql;
 
 use commands::help::*;
 use commands::roulette::*;
@@ -35,7 +41,18 @@ fn start_tracing() {
 
 #[tokio::main]
 async fn main() {
+    //start logging
     start_tracing();
+
+    //test the db connection
+    match test_connection().await {
+        Ok(_) => info!("Successfully connected to database"),
+        Err(e) => {
+            error!("Could not connect to sql database");
+            error!("{}", e);
+            exit(1);
+        }
+    }
 
     let framework = StandardFramework::new()
         .configure(|c| c.prefix("~")) // set the bot's prefix to "~"
