@@ -6,13 +6,12 @@ use serenity::framework::standard::{CommandResult, StandardFramework};
 use serenity::model::channel::Message;
 use serenity::prelude::*;
 
-use sql::test_connection;
 use tracing::log::error;
-use tracing::log::warn;
 use tracing::{info, trace, Level};
 use tracing_subscriber::{filter, fmt, prelude::*};
 
 pub mod commands;
+pub mod redis;
 pub mod secrets;
 pub mod sql;
 
@@ -45,8 +44,17 @@ async fn main() {
     start_tracing();
 
     //test the db connection
-    match test_connection().await {
+    match sql::test_connection().await {
         Ok(_) => info!("Successfully connected to database"),
+        Err(e) => {
+            error!("Could not connect to sql database");
+            error!("{}", e);
+            exit(1);
+        }
+    }
+
+    match redis::test_connection().await {
+        Ok(_) => info!("Successfully connected to redis"),
         Err(e) => {
             error!("Could not connect to sql database");
             error!("{}", e);
