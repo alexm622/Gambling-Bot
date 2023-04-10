@@ -1,6 +1,6 @@
 use std::fs;
 
-pub async fn get_secret(key: &str) -> Secret {
+pub fn get_secret(key: &str) -> Secret {
     let file = fs::read_to_string("./secrets.csv").expect("file unable to read");
 
     for s in file.lines() {

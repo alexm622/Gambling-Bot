@@ -10,6 +10,7 @@ use tracing::log::error;
 use tracing::{info, trace, Level};
 use tracing_subscriber::{filter, fmt, prelude::*};
 
+pub mod Errors;
 pub mod commands;
 pub mod redis;
 pub mod secrets;
@@ -53,7 +54,7 @@ async fn main() {
         }
     }
 
-    match redis::test_connection().await {
+    match redis::test_connection() {
         Ok(_) => info!("Successfully connected to redis"),
         Err(e) => {
             error!("Could not connect to sql database");
@@ -67,8 +68,7 @@ async fn main() {
         .group(&GENERAL_GROUP);
 
     //get the login token from file
-    let key = secrets::get_secret("disc_api").await;
-
+    let key = secrets::get_secret("disc_api");
     let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;
     let mut client = Client::builder(key.value, intents)
         .event_handler(Handler)

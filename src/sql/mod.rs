@@ -8,10 +8,10 @@ pub mod statements;
 pub mod structs;
 
 pub async fn get_db_link() -> String {
-    let db = get_secret("DB").await.value;
-    let user = get_secret("MYSQL_USER").await.value;
-    let pass = get_secret("MYSQL_PASS").await.value;
-    let ip = get_secret("MYSQL_IP").await.value;
+    let db = get_secret("DB").value;
+    let user = get_secret("MYSQL_USER").value;
+    let pass = get_secret("MYSQL_PASS").value;
+    let ip = get_secret("MYSQL_IP").value;
     return format!("mysql://{}:{}@{}/{}", user, pass, ip, db);
 }
 

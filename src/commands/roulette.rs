@@ -91,7 +91,7 @@ async fn make_bet(ctx: &Context, msg: &Message, mut args: Args, user_id: &UserId
     };
 
     //get the amount
-    let amount = match args.single::<u32>() {
+    let amount = match args.single::<u64>() {
         Ok(v) => v,
         Err(_) => {
             info!(

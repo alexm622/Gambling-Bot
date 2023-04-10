@@ -2,6 +2,11 @@
 
 use mysql_async::{params, prelude::Queryable, Pool};
 
+use crate::{
+    redis::users::{self, set_bal},
+    Errors,
+};
+
 use super::{get_db_link, statements, structs::RouletteBet};
 
 pub async fn insert_roulette_bet(bet: RouletteBet) -> Result<(), Box<dyn std::error::Error>> {
@@ -11,7 +16,20 @@ pub async fn insert_roulette_bet(bet: RouletteBet) -> Result<(), Box<dyn std::er
 
     let mut conn = pool.get_conn().await?;
 
-    match conn
+    let balance: u64 = match users::get_user_bal(bet.user_id) {
+        Ok(v) => v,
+        Err(e) => return Err(e),
+    };
+
+    if bet.amount > balance {
+        return Err(Box::new(Errors::GenericError::new(
+            &"not enough balance to bet".to_owned(),
+        )));
+    }
+
+    let new_balance = balance - bet.amount;
+
+    let ret = match conn
         .exec_drop(
             statements::INSERT_ROULETTE_BET,
             params! {
@@ -24,7 +42,11 @@ pub async fn insert_roulette_bet(bet: RouletteBet) -> Result<(), Box<dyn std::er
         )
         .await
     {
-        Ok(_) => Ok(()),
-        Err(e) => Err(Box::new(e)),
-    }
+        Ok(_) => match set_bal(bet.user_id, new_balance) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        },
+        Err(e) => return Err(Box::new(e)),
+    };
+    return ret;
 }

@@ -7,7 +7,7 @@ use serenity::model::prelude::{ChannelId, UserId};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct RouletteBet {
-    pub amount: u32,
+    pub amount: u64,
     pub user_id: UserId,
     pub channel_id: ChannelId,
     pub bet_type: BettingTypes,
