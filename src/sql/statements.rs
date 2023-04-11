@@ -17,3 +17,7 @@ pub const INSERT_ROULETTE_BET: &str = "INSERT INTO roulette_bets
     VALUES (:amount,:user_id,:channel_id,:bet_type,:specific_bet);";
 
 //cleanup
+
+//select
+pub const GET_ROULETTE_BETS: &str =
+    "SELECT amount, user_id, bet_type, specific_bet FROM roulette_bets WHERE channel_id = ";

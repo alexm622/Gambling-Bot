@@ -39,3 +39,27 @@ pub enum BettingTypes {
     ODD = 3,
     SPECIFIC = 4,
 }
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
+pub struct BetResult {
+    pub user_id: u64,
+    pub net: i64,
+    pub bet_type: u8,
+    pub specific_bet: Option<u8>,
+}
+
+impl fmt::Display for BetResult {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "user_id: {}, net: {}, bet_type{}{}",
+            self.user_id,
+            self.net,
+            self.bet_type as u8,
+            match self.specific_bet {
+                Some(s) => format!(", specific_bet: {}", s),
+                _ => String::new(),
+            }
+        )
+    }
+}

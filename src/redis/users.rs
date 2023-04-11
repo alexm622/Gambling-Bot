@@ -4,21 +4,20 @@ use redis::ErrorKind;
 use serenity::model::prelude::UserId;
 use tracing::log::warn;
 
-use super::get_db_link;
+use super::get_conn;
 
 const STARTING_BAL: u64 = 10000;
 
 pub fn get_user_bal(id: UserId) -> Result<u64, Box<dyn std::error::Error>> {
-    let client = match redis::Client::open(get_db_link()) {
+    let mut conn = match get_conn() {
         Ok(v) => v,
-        Err(e) => return Err(Box::new(e)),
-    };
-    let mut conn = match client.get_connection() {
-        Ok(v) => v,
-        Err(e) => return Err(Box::new(e)),
+        Err(e) => return Err(e),
     };
 
-    let bal = match redis::cmd("GET").arg(id.0).query(&mut conn) {
+    let bal = match redis::cmd("GET")
+        .arg(format!("user_{}", id.0))
+        .query(&mut conn)
+    {
         Ok(v) => v,
         Err(e) => {
             warn!("error encountered");
@@ -42,17 +41,12 @@ pub fn get_user_bal(id: UserId) -> Result<u64, Box<dyn std::error::Error>> {
 }
 
 pub fn create_user(id: UserId) -> Result<(), Box<dyn std::error::Error>> {
-    let client = match redis::Client::open(get_db_link()) {
+    let mut conn = match get_conn() {
         Ok(v) => v,
-        Err(e) => return Err(Box::new(e)),
+        Err(e) => return Err(e),
     };
-    let mut conn: redis::Connection = match client.get_connection() {
-        Ok(v) => v,
-        Err(e) => return Err(Box::new(e)),
-    };
-
     match redis::cmd("SET")
-        .arg(id.0)
+        .arg(format!("user_{}", id.0))
         .arg(STARTING_BAL)
         .query::<()>(&mut conn)
     {
@@ -62,17 +56,31 @@ pub fn create_user(id: UserId) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub fn set_bal(id: UserId, bal: u64) -> Result<(), Box<dyn std::error::Error>> {
-    let client = match redis::Client::open(get_db_link()) {
+    let mut conn = match get_conn() {
         Ok(v) => v,
-        Err(e) => return Err(Box::new(e)),
+        Err(e) => return Err(e),
     };
-    let mut conn: redis::Connection = match client.get_connection() {
+    match redis::cmd("SET")
+        .arg(format!("user_{}", id.0))
+        .arg(bal)
+        .query::<()>(&mut conn)
+    {
+        Ok(_) => Ok(()),
+        Err(e) => Err(Box::new(e)),
+    }
+}
+
+pub fn user_exists(id: UserId) -> Result<bool, Box<dyn std::error::Error>> {
+    let mut conn = match get_conn() {
         Ok(v) => v,
-        Err(e) => return Err(Box::new(e)),
+        Err(e) => return Err(e),
     };
 
-    match redis::cmd("SET").arg(id.0).arg(bal).query::<()>(&mut conn) {
-        Ok(_) => Ok(()),
+    match redis::cmd("EXISTS")
+        .arg(format!("user_{}", id.0))
+        .query::<u8>(&mut conn)
+    {
+        Ok(e) => Ok(if e == 1 { true } else { false }),
         Err(e) => Err(Box::new(e)),
     }
 }

@@ -3,8 +3,8 @@
 use mysql_async::{params, prelude::Queryable, Pool};
 
 use crate::{
+    errors,
     redis::users::{self, set_bal},
-    Errors,
 };
 
 use super::{get_db_link, statements, structs::RouletteBet};
@@ -22,7 +22,7 @@ pub async fn insert_roulette_bet(bet: RouletteBet) -> Result<(), Box<dyn std::er
     };
 
     if bet.amount > balance {
-        return Err(Box::new(Errors::GenericError::new(
+        return Err(Box::new(errors::GenericError::new(
             &"not enough balance to bet".to_owned(),
         )));
     }

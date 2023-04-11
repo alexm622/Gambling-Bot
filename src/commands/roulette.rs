@@ -1,13 +1,16 @@
 use serenity::framework::standard::{Args, CommandResult};
 //roulette wheel
 use serenity::framework::standard::macros::command;
-use serenity::model::prelude::{ChannelId, UserId};
+use serenity::model::prelude::{ChannelId, Mention, UserId};
 use serenity::{model::prelude::Message, prelude::Context};
 use tracing::info;
 use tracing::log::warn;
 
+use crate::redis::roulette::spin_table;
 use crate::sql::insert::insert_roulette_bet;
+use crate::sql::select::get_all_bets;
 use crate::sql::structs::{BettingTypes, RouletteBet};
+use crate::utils::roulette::bet_check;
 
 const USAGE_GENERAL: &str =
     "the command is roulette <command> <args>\n the available commands are as follows:
@@ -152,7 +155,7 @@ async fn make_bet(ctx: &Context, msg: &Message, mut args: Args, user_id: &UserId
     let res = match insert_roulette_bet(bet).await {
         Err(e) => {
             warn!("unable to place bet {}", e);
-            msg.reply(ctx, "Failed to place bet.")
+            return Ok(());
         }
         Ok(_) => {
             info!("placed bet of {},{} for userId {}", bet, amount, user_id);
@@ -161,6 +164,52 @@ async fn make_bet(ctx: &Context, msg: &Message, mut args: Args, user_id: &UserId
     };
 
     res.await?;
+
+    let spin = spin_table(msg.channel_id);
+    let val = match spin {
+        Ok(o) => o,
+        Err(_) => {
+            drop(spin);
+            return Ok(());
+        }
+    };
+
+    let spin_result = match val {
+        Some(v) => v,
+        None => {
+            return Ok(());
+        }
+    };
+
+    let bets = get_all_bets(msg.channel_id.0).await?;
+
+    let mut winners = String::new();
+
+    for mut bet in bets {
+        bet_check(&mut bet, spin_result);
+        winners = format!(
+            "{}\n{}",
+            winners,
+            format!(
+                "{} {} {}!",
+                Mention::from(UserId::from(bet.user_id)),
+                if bet.net < 0 { "lost" } else { "won" },
+                bet.net.abs()
+            )
+        )
+    }
+
+    let spin_message = msg.channel_id.say(
+        ctx,
+        format!(
+            "The results are in! the wheel spun a value of {} {}! the winners are as follows:\n{}",
+            spin_result.color.to_string(),
+            spin_result.value,
+            winners,
+        ),
+    );
+
+    spin_message.await?;
 
     Ok(())
 }

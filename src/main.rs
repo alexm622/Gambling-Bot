@@ -6,15 +6,17 @@ use serenity::framework::standard::{CommandResult, StandardFramework};
 use serenity::model::channel::Message;
 use serenity::prelude::*;
 
+use sql::select::get_all_bets;
 use tracing::log::error;
-use tracing::{info, trace, Level};
+use tracing::{info, Level};
 use tracing_subscriber::{filter, fmt, prelude::*};
 
-pub mod Errors;
 pub mod commands;
+pub mod errors;
 pub mod redis;
 pub mod secrets;
 pub mod sql;
+pub mod utils;
 
 use commands::help::*;
 use commands::roulette::*;
@@ -63,6 +65,11 @@ async fn main() {
         }
     }
 
+    match get_all_bets(900023416646680578).await {
+        Ok(_) => info!("was able to Successfully get all bets"),
+        Err(e) => error!("an error occurred: {}", e),
+    }
+
     let framework = StandardFramework::new()
         .configure(|c| c.prefix("~")) // set the bot's prefix to "~"
         .group(&GENERAL_GROUP);
@@ -78,7 +85,7 @@ async fn main() {
 
     // start listening for events by starting a single shard
     if let Err(why) = client.start().await {
-        println!("An error occurred while running the client: {:?}", why);
+        error!("An error occurred while running the client: {:?}", why);
     }
 }
 

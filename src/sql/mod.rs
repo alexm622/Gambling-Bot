@@ -4,6 +4,7 @@ use tracing::info;
 use crate::secrets::get_secret;
 
 pub mod insert;
+pub mod select;
 pub mod statements;
 pub mod structs;
 
