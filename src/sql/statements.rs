@@ -17,6 +17,7 @@ pub const INSERT_ROULETTE_BET: &str = "INSERT INTO roulette_bets
     VALUES (:amount,:user_id,:channel_id,:bet_type,:specific_bet);";
 
 //cleanup
+pub const DROP_OLD_BETS: &str = "DELETE FROM roulette_bets WHERE channel_id = ";
 
 //select
 pub const GET_ROULETTE_BETS: &str =

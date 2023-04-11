@@ -3,6 +3,7 @@
 use core::fmt;
 
 use serde::{Deserialize, Serialize};
+use tracing::info;
 
 use crate::sql::structs::BetResult;
 
@@ -66,27 +67,37 @@ pub fn bet_check(bet: &mut BetResult, spin: SpinResult) {
         0 => {
             if spin.color != Color::RED {
                 bet.net *= -1;
+            } else {
+                bet.net *= 2;
             }
         }
         1 => {
             if spin.color != Color::BLACK {
                 bet.net *= -1;
+            } else {
+                bet.net *= 2;
             }
         }
         2 => {
             if spin.oddness {
                 bet.net *= -1;
+            } else {
+                bet.net *= 2;
             }
         }
         3 => {
             if !spin.oddness {
                 bet.net *= -1;
+            } else {
+                bet.net *= 2;
             }
         }
         4 => match bet.specific_bet {
             Some(v) => {
                 if spin.value == v {
                     bet.net *= 35;
+                } else {
+                    bet.net *= -1;
                 }
             }
             None => {}

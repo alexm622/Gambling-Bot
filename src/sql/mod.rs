@@ -3,6 +3,7 @@ use tracing::info;
 
 use crate::secrets::get_secret;
 
+pub mod delete;
 pub mod insert;
 pub mod select;
 pub mod statements;

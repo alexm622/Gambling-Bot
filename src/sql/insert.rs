@@ -16,7 +16,7 @@ pub async fn insert_roulette_bet(bet: RouletteBet) -> Result<(), Box<dyn std::er
 
     let mut conn = pool.get_conn().await?;
 
-    let balance: u64 = match users::get_user_bal(bet.user_id) {
+    let balance: i64 = match users::get_user_bal(bet.user_id) {
         Ok(v) => v,
         Err(e) => return Err(e),
     };

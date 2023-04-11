@@ -7,9 +7,11 @@ use tracing::info;
 use tracing::log::warn;
 
 use crate::redis::roulette::spin_table;
+use crate::redis::users::apply_winnings;
+use crate::sql::delete::drop_old_bets;
 use crate::sql::insert::insert_roulette_bet;
 use crate::sql::select::get_all_bets;
-use crate::sql::structs::{BettingTypes, RouletteBet};
+use crate::sql::structs::{BetResult, BettingTypes, RouletteBet};
 use crate::utils::roulette::bet_check;
 
 const USAGE_GENERAL: &str =
@@ -94,7 +96,7 @@ async fn make_bet(ctx: &Context, msg: &Message, mut args: Args, user_id: &UserId
     };
 
     //get the amount
-    let amount = match args.single::<u64>() {
+    let amount = match args.single::<i64>() {
         Ok(v) => v,
         Err(_) => {
             info!(
@@ -107,6 +109,11 @@ async fn make_bet(ctx: &Context, msg: &Message, mut args: Args, user_id: &UserId
         }
     };
 
+    if amount <= 0 {
+        msg.reply(ctx, "bet must be 1 or above!").await?;
+        return Ok(());
+    }
+
     //determine bet type
 
     let bet_type = match bet.to_uppercase().as_str() {
@@ -116,7 +123,7 @@ async fn make_bet(ctx: &Context, msg: &Message, mut args: Args, user_id: &UserId
         "ODD" => BettingTypes::ODD,
         b => match b.parse() {
             Ok(v) => {
-                if 0 > v || v > 32 {
+                if 0 > v || v > 36 {
                     warn!(
                         "invalid value entered for bet by userid: {} in channel: {}",
                         user_id, msg.channel_id
@@ -157,15 +164,12 @@ async fn make_bet(ctx: &Context, msg: &Message, mut args: Args, user_id: &UserId
             warn!("unable to place bet {}", e);
             return Ok(());
         }
-        Ok(_) => {
-            info!("placed bet of {},{} for userId {}", bet, amount, user_id);
-            msg.reply(ctx, "Successfully placed bet!")
-        }
+        Ok(_) => msg.reply(ctx, "Successfully placed bet!"),
     };
 
     res.await?;
 
-    let spin = spin_table(msg.channel_id);
+    let spin = spin_table(msg.channel_id).await;
     let val = match spin {
         Ok(o) => o,
         Err(_) => {
@@ -184,9 +188,11 @@ async fn make_bet(ctx: &Context, msg: &Message, mut args: Args, user_id: &UserId
     let bets = get_all_bets(msg.channel_id.0).await?;
 
     let mut winners = String::new();
+    let mut new_vec: Vec<BetResult> = Vec::new();
 
     for mut bet in bets {
         bet_check(&mut bet, spin_result);
+        new_vec.push(bet.clone());
         winners = format!(
             "{}\n{}",
             winners,
@@ -202,12 +208,18 @@ async fn make_bet(ctx: &Context, msg: &Message, mut args: Args, user_id: &UserId
     let spin_message = msg.channel_id.say(
         ctx,
         format!(
-            "The results are in! the wheel spun a value of {} {}! the winners are as follows:\n{}",
+            "The results are in! the wheel spun a value of {} {}! the results are as follows:\n{}",
             spin_result.color.to_string(),
             spin_result.value,
             winners,
         ),
     );
+    //apply the net to users and clear bets
+
+    drop_old_bets(msg.channel_id).await?;
+
+    //apply nets
+    apply_winnings(new_vec);
 
     spin_message.await?;
 

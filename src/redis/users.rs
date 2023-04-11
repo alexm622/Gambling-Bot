@@ -2,13 +2,15 @@
 
 use redis::ErrorKind;
 use serenity::model::prelude::UserId;
-use tracing::log::warn;
+use tracing::log::{info, warn};
+
+use crate::sql::structs::BetResult;
 
 use super::get_conn;
 
-const STARTING_BAL: u64 = 10000;
+const STARTING_BAL: i64 = 10000;
 
-pub fn get_user_bal(id: UserId) -> Result<u64, Box<dyn std::error::Error>> {
+pub fn get_user_bal(id: UserId) -> Result<i64, Box<dyn std::error::Error>> {
     let mut conn = match get_conn() {
         Ok(v) => v,
         Err(e) => return Err(e),
@@ -55,7 +57,7 @@ pub fn create_user(id: UserId) -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-pub fn set_bal(id: UserId, bal: u64) -> Result<(), Box<dyn std::error::Error>> {
+pub fn set_bal(id: UserId, bal: i64) -> Result<(), Box<dyn std::error::Error>> {
     let mut conn = match get_conn() {
         Ok(v) => v,
         Err(e) => return Err(e),
@@ -82,5 +84,31 @@ pub fn user_exists(id: UserId) -> Result<bool, Box<dyn std::error::Error>> {
     {
         Ok(e) => Ok(if e == 1 { true } else { false }),
         Err(e) => Err(Box::new(e)),
+    }
+}
+
+pub fn user_add(id: UserId, add: i64) -> Result<(), Box<dyn std::error::Error>> {
+    let bal: i64 = match get_user_bal(id) {
+        Ok(v) => v as i64 + add,
+        Err(e) => return Err(e),
+    };
+
+    match set_bal(id, bal) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e),
+    }
+}
+
+pub fn apply_winnings(winnings: Vec<BetResult>) {
+    for win in winnings {
+        if win.net > 0 {
+            match user_add(UserId::from(win.user_id), win.net) {
+                Ok(_) => {}
+                Err(e) => {
+                    warn!("unable to add to balance");
+                    warn!("{}", e);
+                }
+            }
+        }
     }
 }
