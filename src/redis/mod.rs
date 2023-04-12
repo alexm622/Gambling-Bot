@@ -3,6 +3,7 @@ use tracing::info;
 use crate::secrets::get_secret;
 
 pub mod channels;
+pub mod decks;
 pub mod users;
 
 //games

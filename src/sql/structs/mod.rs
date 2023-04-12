@@ -63,3 +63,85 @@ impl fmt::Display for BetResult {
         )
     }
 }
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Card {
+    ONE = 1,
+    TWO = 2,
+    THREE = 3,
+    FOUR = 4,
+    FIVE = 5,
+    SIX = 6,
+    SEVEN = 7,
+    EIGHT = 8,
+    NINE = 9,
+    TEN = 10,
+    JACK = 11,
+    QUEEN = 12,
+    KING = 13,
+}
+impl fmt::Display for Card {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Card::ONE => write!(f, "ONE"),
+            Card::TWO => write!(f, "TWO"),
+            Card::THREE => write!(f, "THREE"),
+            Card::FOUR => write!(f, "FOUR"),
+            Card::FIVE => write!(f, "FIVE"),
+            Card::SIX => write!(f, "SIX"),
+            Card::SEVEN => write!(f, "SEVEN"),
+            Card::EIGHT => write!(f, "EIGHT"),
+            Card::NINE => write!(f, "NINE"),
+            Card::TEN => write!(f, "TEN"),
+            Card::JACK => write!(f, "JACK"),
+            Card::QUEEN => write!(f, "QUEEN"),
+            Card::KING => write!(f, "KING"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Suite {
+    DIAMONDS = 0,
+    HEARTS = 1,
+    CLUBS = 2,
+    SPADES = 3,
+}
+
+impl fmt::Display for Suite {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Suite::DIAMONDS => write!(f, "DIAMONDS"),
+            Suite::HEARTS => write!(f, "HEARTS"),
+            Suite::CLUBS => write!(f, "CLUBS"),
+            Suite::SPADES => write!(f, "SPADES"),
+        }
+    }
+}
+
+pub struct PokerHand {
+    pub one: (Card, Suite),
+    pub two: (Card, Suite),
+    pub three: (Card, Suite),
+    pub four: (Card, Suite),
+    pub five: (Card, Suite),
+}
+
+impl fmt::Display for PokerHand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{} of {} \n{} of {} \n{} of {} \n{} of {} \n{} of {} \n",
+            self.one.0,
+            self.one.1,
+            self.two.0,
+            self.two.1,
+            self.three.0,
+            self.three.1,
+            self.four.0,
+            self.four.1,
+            self.five.0,
+            self.five.1
+        )
+    }
+}

@@ -20,10 +20,11 @@ pub mod utils;
 
 use commands::help::*;
 use commands::money::*;
+use commands::poker::*;
 use commands::roulette::*;
 
 #[group]
-#[commands(ping, help, roulette, bal)]
+#[commands(ping, help, roulette, bal, poker, pplay, discard, check, raise, fold)]
 struct General;
 
 struct Handler;
