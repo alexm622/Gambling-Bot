@@ -118,6 +118,7 @@ impl fmt::Display for Suite {
         }
     }
 }
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
 
 pub struct PokerHand {
     pub one: (Card, Suite),

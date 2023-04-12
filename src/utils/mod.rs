@@ -1,5 +1,3 @@
-use std::string;
-
 use serde::{Deserialize, Serialize};
 use tracing::{info, log::warn};
 
@@ -16,7 +14,7 @@ pub struct Deck {
 pub const SIZE_POKER: u8 = 52 * 4;
 
 impl Deck {
-    pub fn new(size: u8) -> Self {
+    pub fn new() -> Self {
         info!("creating new deck");
         Deck { deck: Vec::new() }
     }
@@ -24,40 +22,25 @@ impl Deck {
 
 //generate a brand new deck of size (size) and shuffle it
 pub fn generate_deck(size: u8) -> Deck {
-    let deck = Deck::new(size);
+    let mut deck = Deck::new();
+    info!("attempting to generate a new deck");
     for i in 0..size {
         deck.deck.push(int_to_card(i % 52));
     }
+    info!("deck created!");
     shuffle_deck(&mut deck);
+    info!("done shuffling");
     return deck;
-}
-
-//draw count cards from deck, reshuffle and
-//replenish deck if it is empty
-pub fn draw_cards(deck: &mut Deck, count: u8, size: u8) -> Vec<(Card, Suite)> {
-    if count > size {
-        return deck.deck;
-    }
-    let drawn: Vec<(Card, Suite)> = Vec::new();
-    if (deck.deck.len() as u8) < count {
-        deck = &mut generate_deck(size);
-        shuffle_deck(deck);
-    }
-
-    for i in 0..count {
-        drawn.push(deck.deck.pop().unwrap());
-    }
-
-    return drawn;
 }
 
 //shuffle the deck
 pub fn shuffle_deck(deck: &mut Deck) {
-    let new_vec: Vec<(Card, Suite)> = Vec::new();
+    let mut new_vec: Vec<(Card, Suite)> = Vec::new();
 
     while !deck.deck.is_empty() {
         let index = rand::random::<u8>() % deck.deck.len() as u8;
-        let card = deck.deck.get(index as usize).unwrap();
+        let card = deck.deck.remove(index as usize);
+
         new_vec.push(card.clone());
     }
 
@@ -74,7 +57,7 @@ pub fn card_to_int(card: (Card, Suite)) -> u8 {
 
 //convert the int to a enum tuple
 pub fn int_to_card(card_u8: u8) -> (Card, Suite) {
-    let card_u8 = card_u8 % 13;
+    let card_u8 = card_u8 % 13 + 1;
     let suite_u8 = card_u8 % 4;
     let card = match card_u8 {
         1 => Card::ONE,
@@ -90,8 +73,9 @@ pub fn int_to_card(card_u8: u8) -> (Card, Suite) {
         11 => Card::JACK,
         12 => Card::QUEEN,
         13 => Card::KING,
-        _ => {
+        v => {
             warn!("something went wrong");
+            warn!("got value of: {} for card", v);
             Card::ONE
         }
     };
@@ -101,8 +85,9 @@ pub fn int_to_card(card_u8: u8) -> (Card, Suite) {
         1 => Suite::HEARTS,
         2 => Suite::CLUBS,
         3 => Suite::SPADES,
-        _ => {
+        v => {
             warn!("Something went wrong");
+            warn!("got value of {} for suite", v);
             Suite::SPADES
         }
     };

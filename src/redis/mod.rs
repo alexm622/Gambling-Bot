@@ -4,6 +4,7 @@ use crate::secrets::get_secret;
 
 pub mod channels;
 pub mod decks;
+pub mod poker;
 pub mod users;
 
 //games

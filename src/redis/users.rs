@@ -2,7 +2,7 @@
 
 use redis::ErrorKind;
 use serenity::model::prelude::UserId;
-use tracing::log::{info, warn};
+use tracing::log::warn;
 
 use crate::sql::structs::BetResult;
 

@@ -70,7 +70,7 @@ pub async fn roulette(ctx: &Context, msg: &Message, mut args: Args) -> CommandRe
 
     //process the command
     match command.to_lowercase().as_str() {
-        "bet" => make_bet(ctx, msg, args, &user_id).await,
+        "bet" => rplay(ctx, msg, args).await,
         "odds" => odds(ctx, msg, args, &user_id).await,
         "table" => table(ctx, msg, &channel_id, &user_id).await,
         &_ => {
@@ -79,8 +79,9 @@ pub async fn roulette(ctx: &Context, msg: &Message, mut args: Args) -> CommandRe
         }
     }
 }
-
-async fn make_bet(ctx: &Context, msg: &Message, mut args: Args, user_id: &UserId) -> CommandResult {
+#[command]
+pub async fn rplay(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let user_id = &msg.author.id;
     //get the bet
     let bet = match args.single::<String>() {
         Ok(v) => v,

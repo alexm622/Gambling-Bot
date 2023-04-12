@@ -3,7 +3,6 @@
 use core::fmt;
 
 use serde::{Deserialize, Serialize};
-use tracing::info;
 
 use crate::sql::structs::BetResult;
 

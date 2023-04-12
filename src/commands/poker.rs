@@ -2,12 +2,17 @@
 
 use serenity::{
     framework::standard::{macros::command, Args, CommandResult},
-    model::prelude::{Message, UserId},
+    model::prelude::{Channel, ChannelId, Message, UserId},
     prelude::Context,
 };
-use tracing::info;
+use tracing::{info, log::warn};
 
-use crate::{errors::GenericError, sql::structs::PokerHand};
+use crate::{
+    errors::GenericError,
+    redis::{decks::set_deck, poker::get_user_hand},
+    sql::structs::PokerHand,
+    utils::{generate_deck, SIZE_POKER},
+};
 
 const USAGE_GENERAL: &str =
     "the command is poker <command> <args>\n the available commands are as follows:
@@ -58,9 +63,6 @@ pub async fn poker(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
         return Ok(());
     }
 
-    let user_id = msg.author.id;
-    let channel_id = msg.channel_id;
-
     match command.to_lowercase().as_str() {
         "play" => pplay(ctx, msg, args).await,
         "discard" => discard(ctx, msg, args).await,
@@ -75,14 +77,35 @@ pub async fn poker(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
 }
 
 #[command]
-pub async fn pplay(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
-    msg.reply(ctx, format!("dealing in player {}", msg.author.id))
-        .await;
+pub async fn pplay(ctx: &Context, msg: &Message) -> CommandResult {
+    let msg_id = msg.id;
+
+    //Message::reply(msg, ctx, "attempting to deal you in").await?;
+    let hand = match deal(msg.author.id, msg.channel_id).await {
+        Ok(v) => v,
+        Err(e) => {
+            warn!("encountered error: {}", e);
+            return Ok(());
+        }
+    };
+    info!("got hand {}", hand);
+    msg.channel_id
+        .say(ctx, format!("your hand is: {}", hand.to_string()))
+        .await?;
+
     Ok(())
 }
 
 //deal in player
-pub async fn deal(uid: UserId, cid: ChannelId) -> Result<PokerHand, GenericError> {}
+pub async fn deal(uid: UserId, cid: ChannelId) -> Result<PokerHand, GenericError> {
+    //temporary function to check deck creation
+    let hand = match get_user_hand(cid, uid) {
+        Ok(v) => v,
+        Err(e) => return Err(GenericError::new(&e.to_string())),
+    };
+
+    Ok(hand)
+}
 
 #[command]
 pub async fn discard(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {

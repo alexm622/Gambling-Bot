@@ -24,7 +24,9 @@ use commands::poker::*;
 use commands::roulette::*;
 
 #[group]
-#[commands(ping, help, roulette, bal, poker, pplay, discard, check, raise, fold)]
+#[commands(
+    ping, help, roulette, rplay, bal, poker, pplay, discard, check, raise, fold
+)]
 struct General;
 
 struct Handler;
