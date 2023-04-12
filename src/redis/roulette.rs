@@ -12,6 +12,7 @@ use crate::{
 
 use super::get_db_link;
 
+//check to see if there is a table
 pub fn table_exists(id: ChannelId) -> Result<bool, RedisError> {
     let client = match redis::Client::open(get_db_link()) {
         Ok(v) => v,
@@ -31,6 +32,7 @@ pub fn table_exists(id: ChannelId) -> Result<bool, RedisError> {
     }
 }
 
+//activate table mutex
 pub fn activate_table(id: ChannelId) -> Result<(), RedisError> {
     let client = match redis::Client::open(get_db_link()) {
         Ok(v) => v,
@@ -53,6 +55,7 @@ pub fn activate_table(id: ChannelId) -> Result<(), RedisError> {
     }
 }
 
+//spin the table
 pub async fn spin_table(id: ChannelId) -> Result<Option<SpinResult>, RedisError> {
     if !match table_exists(id) {
         Ok(e) => {

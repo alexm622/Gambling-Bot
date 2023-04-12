@@ -5,6 +5,7 @@ use serenity::model::prelude::ChannelId;
 
 use super::{get_db_link, statements::DROP_OLD_BETS};
 
+//delete all old bets
 pub async fn drop_old_bets(id: ChannelId) -> Result<(), mysql_async::Error> {
     let url = get_db_link().await;
 

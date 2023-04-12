@@ -22,6 +22,7 @@ impl Deck {
     }
 }
 
+//generate a brand new deck of size (size) and shuffle it
 pub fn generate_deck(size: u8) -> Deck {
     let deck = Deck::new(size);
     for i in 0..size {
@@ -31,6 +32,8 @@ pub fn generate_deck(size: u8) -> Deck {
     return deck;
 }
 
+//draw count cards from deck, reshuffle and
+//replenish deck if it is empty
 pub fn draw_cards(deck: &mut Deck, count: u8, size: u8) -> Vec<(Card, Suite)> {
     if count > size {
         return deck.deck;
@@ -48,6 +51,7 @@ pub fn draw_cards(deck: &mut Deck, count: u8, size: u8) -> Vec<(Card, Suite)> {
     return drawn;
 }
 
+//shuffle the deck
 pub fn shuffle_deck(deck: &mut Deck) {
     let new_vec: Vec<(Card, Suite)> = Vec::new();
 
@@ -60,6 +64,7 @@ pub fn shuffle_deck(deck: &mut Deck) {
     deck.deck = new_vec;
 }
 
+//convert enum tuple to int
 pub fn card_to_int(card: (Card, Suite)) -> u8 {
     let card_u8 = card.0 as u8;
     let suite_u8 = card.1 as u8;
@@ -67,6 +72,7 @@ pub fn card_to_int(card: (Card, Suite)) -> u8 {
     return suite_u8 * 13 + card_u8;
 }
 
+//convert the int to a enum tuple
 pub fn int_to_card(card_u8: u8) -> (Card, Suite) {
     let card_u8 = card_u8 % 13;
     let suite_u8 = card_u8 % 4;
@@ -103,9 +109,10 @@ pub fn int_to_card(card_u8: u8) -> (Card, Suite) {
     return (card, suite);
 }
 
+//convert the gameid in to a name
 pub fn game_id_to_name(game_id: u8) -> String {
     match game_id {
         0 => String::from("poker"),
-        _ => String::from("poker"),
+        _ => String::from("unknown"),
     }
 }

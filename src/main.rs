@@ -71,6 +71,8 @@ async fn main() {
         .configure(|c| c.prefix("~")) // set the bot's prefix to "~"
         .group(&GENERAL_GROUP);
 
+    // TODO refund all open tables
+
     //get the login token from file
     let key = secrets::get_secret("disc_api");
     let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;

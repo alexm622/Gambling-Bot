@@ -10,6 +10,7 @@ use super::get_conn;
 
 const STARTING_BAL: i64 = 10000;
 
+//get the balance of user (uid)
 pub fn get_user_bal(id: UserId) -> Result<i64, Box<dyn std::error::Error>> {
     let mut conn = match get_conn() {
         Ok(v) => v,
@@ -42,6 +43,7 @@ pub fn get_user_bal(id: UserId) -> Result<i64, Box<dyn std::error::Error>> {
     Ok(bal)
 }
 
+//create a user in redis
 pub fn create_user(id: UserId) -> Result<(), Box<dyn std::error::Error>> {
     let mut conn = match get_conn() {
         Ok(v) => v,
@@ -57,6 +59,7 @@ pub fn create_user(id: UserId) -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
+//set the balance of a user
 pub fn set_bal(id: UserId, bal: i64) -> Result<(), Box<dyn std::error::Error>> {
     let mut conn = match get_conn() {
         Ok(v) => v,
@@ -72,6 +75,7 @@ pub fn set_bal(id: UserId, bal: i64) -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
+//check if a user exists
 pub fn user_exists(id: UserId) -> Result<bool, Box<dyn std::error::Error>> {
     let mut conn = match get_conn() {
         Ok(v) => v,
@@ -87,6 +91,7 @@ pub fn user_exists(id: UserId) -> Result<bool, Box<dyn std::error::Error>> {
     }
 }
 
+//add a user to redis
 pub fn user_add(id: UserId, add: i64) -> Result<(), Box<dyn std::error::Error>> {
     let bal: i64 = match get_user_bal(id) {
         Ok(v) => v as i64 + add,
@@ -99,6 +104,7 @@ pub fn user_add(id: UserId, add: i64) -> Result<(), Box<dyn std::error::Error>> 
     }
 }
 
+//apply a net balance to the user
 pub fn apply_winnings(winnings: Vec<BetResult>) {
     for win in winnings {
         if win.net > 0 {

@@ -31,6 +31,7 @@ impl fmt::Display for Color {
     }
 }
 
+//spin the table
 pub fn get_spin() -> SpinResult {
     let rng = rand::random::<u8>() % 38;
 
@@ -41,6 +42,7 @@ pub fn get_spin() -> SpinResult {
     };
 }
 
+//get the color that was landed on
 pub fn get_color(rng: u8) -> Color {
     if rng == 0 || rng == 37 {
         return Color::GREEN;
@@ -62,6 +64,7 @@ pub fn get_color(rng: u8) -> Color {
     }
 }
 
+//check all the current bets against the table
 pub fn bet_check(bet: &mut BetResult, spin: SpinResult) {
     match bet.bet_type {
         0 => {

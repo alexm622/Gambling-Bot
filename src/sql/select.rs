@@ -1,6 +1,7 @@
 use super::{get_db_link, statements::GET_ROULETTE_BETS, structs::BetResult};
 use mysql_async::{prelude::Queryable, Pool};
 
+// get all roulette bets and put them into a vector
 pub async fn get_all_bets(id: u64) -> Result<Vec<BetResult>, mysql_async::Error> {
     let url = get_db_link().await;
 

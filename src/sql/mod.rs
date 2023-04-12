@@ -9,6 +9,7 @@ pub mod select;
 pub mod statements;
 pub mod structs;
 
+//get the sql db link
 pub async fn get_db_link() -> String {
     let db = get_secret("DB").value;
     let user = get_secret("MYSQL_USER").value;
@@ -17,6 +18,7 @@ pub async fn get_db_link() -> String {
     return format!("mysql://{}:{}@{}/{}", user, pass, ip, db);
 }
 
+//initialize
 pub async fn init_sql() {
     let url = get_db_link().await;
 
@@ -28,6 +30,7 @@ pub async fn init_sql() {
     conn.query_drop(statements::CREATE_ROULETTE_TABLE);
 }
 
+//test connection to mysql
 pub async fn test_connection() -> Result<(), mysql_async::Error> {
     info!("the db link is \"{}\"", get_db_link().await);
     let url = get_db_link().await;

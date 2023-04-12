@@ -9,6 +9,7 @@ use crate::{
 
 use super::{get_db_link, statements, structs::RouletteBet};
 
+//insert a bet into roulette
 pub async fn insert_roulette_bet(bet: RouletteBet) -> Result<(), Box<dyn std::error::Error>> {
     let url = get_db_link().await;
 

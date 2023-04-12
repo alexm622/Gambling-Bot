@@ -5,6 +5,7 @@ use crate::utils::{card_to_int, game_id_to_name, Deck};
 
 use super::get_conn;
 
+//set the deck in redis
 pub fn set_deck(cid: ChannelId, deck: Deck, game_id: u8) -> Result<(), Box<dyn std::error::Error>> {
     let mut conn = match get_conn() {
         Ok(v) => v,
@@ -26,6 +27,7 @@ pub fn set_deck(cid: ChannelId, deck: Deck, game_id: u8) -> Result<(), Box<dyn s
     Ok(())
 }
 
+//push a single card to redis
 pub fn push_card(
     cid: ChannelId,
     game_id: u8,
@@ -53,6 +55,7 @@ pub fn get_deck(cid: ChannelId) {}
 
 pub fn shuffle_deck(cid: ChannelId) {}
 
+//delete a deck
 pub fn clear_deck(cid: ChannelId, game_id: u8) -> Result<(), Box<dyn std::error::Error>> {
     let mut conn = match get_conn() {
         Ok(v) => v,
@@ -68,6 +71,7 @@ pub fn clear_deck(cid: ChannelId, game_id: u8) -> Result<(), Box<dyn std::error:
     }
 }
 
+//check if deck exists
 pub fn deck_exists(cid: ChannelId, game_id: u8) -> Result<bool, Box<dyn std::error::Error>> {
     let mut conn = match get_conn() {
         Ok(v) => v,

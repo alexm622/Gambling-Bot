@@ -4,6 +4,7 @@ use serenity::model::prelude::ChannelId;
 
 use super::get_conn;
 
+//channel exists (WIP)
 pub fn channel_exists(id: ChannelId) -> Result<bool, Box<dyn std::error::Error>> {
     let mut conn = match get_conn() {
         Ok(v) => v,

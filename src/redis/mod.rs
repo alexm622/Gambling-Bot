@@ -13,7 +13,7 @@ pub fn get_db_link() -> String {
     let ip = get_secret("REDIS_IP").value;
     return format!("redis://{}", ip);
 }
-
+//test the connection to redis
 pub fn test_connection() -> Result<(), Box<dyn std::error::Error>> {
     info!("the db link is \"{}\"", get_db_link());
     let client = match redis::Client::open(get_db_link()) {
@@ -27,6 +27,7 @@ pub fn test_connection() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
+//get the redis connection
 pub fn get_conn() -> Result<redis::Connection, Box<dyn std::error::Error>> {
     let client = match redis::Client::open(get_db_link()) {
         Ok(v) => v,
