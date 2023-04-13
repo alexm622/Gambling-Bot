@@ -1,27 +1,18 @@
 use core::time;
-use std::thread;
-
 use redis::RedisError;
 use serenity::model::prelude::ChannelId;
-use tracing::{info, trace};
+use tracing::info;
 
 use crate::{
     constants::ROULETTE_EXPIRE_TIME_SECONDS,
     utils::roulette::{get_spin, SpinResult},
 };
 
-use super::get_db_link;
+use super::get_conn;
 
 //check to see if there is a table
-pub fn table_exists(id: ChannelId) -> Result<bool, RedisError> {
-    let client = match redis::Client::open(get_db_link()) {
-        Ok(v) => v,
-        Err(e) => return Err(e),
-    };
-    let mut conn: redis::Connection = match client.get_connection() {
-        Ok(v) => v,
-        Err(e) => return Err(e),
-    };
+pub async fn table_exists(id: ChannelId) -> Result<bool, RedisError> {
+    let mut conn = get_conn().await?;
 
     match redis::cmd("EXISTS")
         .arg(format!("roulette_{}", id.0))
@@ -33,16 +24,8 @@ pub fn table_exists(id: ChannelId) -> Result<bool, RedisError> {
 }
 
 //activate table mutex
-pub fn activate_table(id: ChannelId) -> Result<(), RedisError> {
-    let client = match redis::Client::open(get_db_link()) {
-        Ok(v) => v,
-        Err(e) => return Err(e),
-    };
-    let mut conn: redis::Connection = match client.get_connection() {
-        Ok(v) => v,
-        Err(e) => return Err(e),
-    };
-
+pub async fn activate_table(id: ChannelId) -> Result<(), RedisError> {
+    let mut conn = get_conn().await?;
     match redis::cmd("SET")
         .arg(format!("roulette_{}", id.0))
         .arg("1")
@@ -57,14 +40,14 @@ pub fn activate_table(id: ChannelId) -> Result<(), RedisError> {
 
 //spin the table
 pub async fn spin_table(id: ChannelId) -> Result<Option<SpinResult>, RedisError> {
-    if !match table_exists(id) {
+    if !match table_exists(id).await {
         Ok(e) => {
             info!("table active: {}", e);
             e
         }
         Err(e) => return Err(e),
     } {
-        match activate_table(id) {
+        match activate_table(id).await {
             Ok(_) => {}
             Err(e) => return Err(e),
         };

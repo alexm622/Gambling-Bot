@@ -12,7 +12,7 @@ use crate::redis::users::get_user_bal;
 #[command]
 pub async fn bal(ctx: &Context, msg: &Message) -> CommandResult {
     let uid = msg.author.id;
-    let bal = match get_user_bal(uid) {
+    let bal = match get_user_bal(uid).await {
         Ok(v) => v,
         Err(e) => {
             warn!("issue getting balance of uid: {}", uid);

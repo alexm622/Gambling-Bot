@@ -1,5 +1,6 @@
 //poker
 
+use redis::RedisError;
 use serenity::model::prelude::{ChannelId, UserId};
 use tracing::info;
 
@@ -10,8 +11,8 @@ use crate::{
 
 use super::get_conn;
 
-pub fn get_user_hand(cid: ChannelId, uid: UserId) -> Result<PokerHand, Box<dyn std::error::Error>> {
-    let mut conn = match get_conn() {
+pub async fn get_user_hand(cid: ChannelId, uid: UserId) -> Result<PokerHand, RedisError> {
+    let mut conn = match get_conn().await {
         Ok(v) => v,
         Err(e) => return Err(e),
     };
@@ -25,12 +26,12 @@ pub fn get_user_hand(cid: ChannelId, uid: UserId) -> Result<PokerHand, Box<dyn s
         .query::<u8>(&mut conn)
     {
         Ok(v) => v,
-        Err(e) => return Err(Box::new(e)),
+        Err(e) => return Err(e),
     };
 
     if len == 0 {
-        let hand = get_new_poker_hand(cid)?;
-        push_poker_hand(hand, cid, uid)?;
+        let hand = get_new_poker_hand(cid).await?;
+        push_poker_hand(hand, cid, uid).await?;
         return Ok(hand);
     }
 
@@ -41,7 +42,7 @@ pub fn get_user_hand(cid: ChannelId, uid: UserId) -> Result<PokerHand, Box<dyn s
         .query::<Vec<u8>>(&mut conn)
     {
         Ok(v) => v,
-        Err(e) => return Err(Box::new(e)),
+        Err(e) => return Err(e),
     };
 
     let hand: PokerHand = PokerHand {
@@ -52,16 +53,16 @@ pub fn get_user_hand(cid: ChannelId, uid: UserId) -> Result<PokerHand, Box<dyn s
         five: int_to_card(hand_primative.pop().unwrap()),
     };
 
-    push_poker_hand(hand, cid, uid)?;
+    push_poker_hand(hand, cid, uid).await?;
     Ok(hand)
 }
 
-pub fn push_poker_hand(
+pub async fn push_poker_hand(
     hand: PokerHand,
     cid: ChannelId,
     uid: UserId,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let mut conn = match get_conn() {
+) -> Result<(), RedisError> {
+    let mut conn = match get_conn().await {
         Ok(v) => v,
         Err(e) => return Err(e),
     };
@@ -73,7 +74,7 @@ pub fn push_poker_hand(
         .query::<()>(&mut conn)
     {
         Ok(_) => {}
-        Err(e) => return Err(Box::new(e)),
+        Err(e) => return Err(e),
     };
 
     match redis::cmd("LPUSH")
@@ -86,6 +87,6 @@ pub fn push_poker_hand(
         .query::<()>(&mut conn)
     {
         Ok(_) => Ok(()),
-        Err(e) => Err(Box::new(e)),
+        Err(e) => Err(e),
     }
 }

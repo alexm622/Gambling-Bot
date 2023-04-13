@@ -6,7 +6,7 @@ use serenity::framework::standard::{CommandResult, StandardFramework};
 use serenity::model::channel::Message;
 use serenity::prelude::*;
 
-use tracing::log::error;
+use tracing::log::{error, warn};
 use tracing::{info, Level};
 use tracing_subscriber::{filter, fmt, prelude::*};
 
@@ -22,6 +22,7 @@ use commands::help::*;
 use commands::money::*;
 use commands::poker::*;
 use commands::roulette::*;
+use utils::cleanup::cleanup;
 
 #[group]
 #[commands(
@@ -60,10 +61,21 @@ async fn main() {
         }
     }
 
-    match redis::test_connection() {
+    match redis::test_connection().await {
         Ok(_) => info!("Successfully connected to redis"),
         Err(e) => {
             error!("Could not connect to sql database");
+            error!("{}", e);
+            exit(1);
+        }
+    }
+
+    match cleanup().await {
+        Ok(_) => {
+            info!("Successfully cleaned up!")
+        }
+        Err(e) => {
+            error!("Could not clean up");
             error!("{}", e);
             exit(1);
         }

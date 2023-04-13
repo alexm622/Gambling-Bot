@@ -3,6 +3,7 @@ use tracing::{info, log::warn};
 
 use crate::sql::structs::{Card, Suite};
 
+pub mod cleanup;
 pub mod poker;
 pub mod roulette;
 

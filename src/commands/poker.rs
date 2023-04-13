@@ -99,7 +99,7 @@ pub async fn pplay(ctx: &Context, msg: &Message) -> CommandResult {
 //deal in player
 pub async fn deal(uid: UserId, cid: ChannelId) -> Result<PokerHand, GenericError> {
     //temporary function to check deck creation
-    let hand = match get_user_hand(cid, uid) {
+    let hand = match get_user_hand(cid, uid).await {
         Ok(v) => v,
         Err(e) => return Err(GenericError::new(&e.to_string())),
     };

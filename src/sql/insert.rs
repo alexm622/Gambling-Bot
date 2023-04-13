@@ -3,29 +3,29 @@
 use mysql_async::{params, prelude::Queryable, Pool};
 
 use crate::{
-    errors,
-    redis::users::{self, set_bal},
+    errors::GenericError,
+    redis::users::{get_user_bal, set_bal},
 };
 
 use super::{get_db_link, statements, structs::RouletteBet};
 
 //insert a bet into roulette
-pub async fn insert_roulette_bet(bet: RouletteBet) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn insert_roulette_bet(bet: RouletteBet) -> Result<(), GenericError> {
     let url = get_db_link().await;
 
     let pool = Pool::new(url.as_str());
 
-    let mut conn = pool.get_conn().await?;
-
-    let balance: i64 = match users::get_user_bal(bet.user_id) {
+    let mut conn = match pool.get_conn().await {
         Ok(v) => v,
-        Err(e) => return Err(e),
+        Err(e) => return Err(GenericError::new(&e.to_string().clone())),
     };
 
+    let balance: i64 = match get_user_bal(bet.user_id).await {
+        Ok(v) => v,
+        Err(e) => return Err(GenericError::new(&e.to_string().clone())),
+    };
     if bet.amount > balance {
-        return Err(Box::new(errors::GenericError::new(
-            &"not enough balance to bet".to_owned(),
-        )));
+        return Err(GenericError::new(&"not enough balance to bet".to_owned()));
     }
 
     let new_balance = balance - bet.amount;
@@ -43,11 +43,11 @@ pub async fn insert_roulette_bet(bet: RouletteBet) -> Result<(), Box<dyn std::er
         )
         .await
     {
-        Ok(_) => match set_bal(bet.user_id, new_balance) {
+        Ok(_) => match set_bal(bet.user_id, new_balance).await {
             Ok(_) => Ok(()),
-            Err(e) => Err(e),
+            Err(e) => return Err(GenericError::new(&e.to_string().clone())),
         },
-        Err(e) => return Err(Box::new(e)),
+        Err(e) => return Err(GenericError::new(&e.to_string().clone())),
     };
     return ret;
 }
