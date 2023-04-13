@@ -1,3 +1,4 @@
+pub mod blackjack;
 pub mod help;
 pub mod money;
 pub mod poker;

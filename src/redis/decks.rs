@@ -3,7 +3,10 @@ use serenity::model::prelude::ChannelId;
 
 use crate::{
     sql::structs::{Card, Suite},
-    utils::{card_to_int, game_id_to_name, generate_deck, int_to_card, Deck},
+    utils::{
+        deck::{card_to_int, generate_deck, int_to_card, Deck},
+        game_id_to_name,
+    },
 };
 
 use super::get_conn;

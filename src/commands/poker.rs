@@ -2,17 +2,12 @@
 
 use serenity::{
     framework::standard::{macros::command, Args, CommandResult},
-    model::prelude::{Channel, ChannelId, Message, UserId},
+    model::prelude::{ChannelId, Message, UserId},
     prelude::Context,
 };
 use tracing::{info, log::warn};
 
-use crate::{
-    errors::GenericError,
-    redis::{decks::set_deck, poker::get_user_hand},
-    sql::structs::PokerHand,
-    utils::{generate_deck, SIZE_POKER},
-};
+use crate::{errors::GenericError, redis::poker::get_user_hand, sql::structs::PokerHand};
 
 const USAGE_GENERAL: &str =
     "the command is poker <command> <args>\n the available commands are as follows:
@@ -78,8 +73,6 @@ pub async fn poker(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
 
 #[command]
 pub async fn pplay(ctx: &Context, msg: &Message) -> CommandResult {
-    let msg_id = msg.id;
-
     //Message::reply(msg, ctx, "attempting to deal you in").await?;
     let hand = match deal(msg.author.id, msg.channel_id).await {
         Ok(v) => v,

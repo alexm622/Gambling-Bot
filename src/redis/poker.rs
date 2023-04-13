@@ -6,7 +6,10 @@ use tracing::info;
 
 use crate::{
     sql::structs::PokerHand,
-    utils::{card_to_int, int_to_card, poker::get_new_poker_hand},
+    utils::{
+        deck::{card_to_int, int_to_card},
+        poker::get_new_poker_hand,
+    },
 };
 
 use super::get_conn;
