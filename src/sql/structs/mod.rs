@@ -5,6 +5,8 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use serenity::model::prelude::{ChannelId, UserId};
 
+use crate::utils::card_ascii::{BLACK_CARDS, RED_CARDS, SUITES};
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct RouletteBet {
     pub amount: i64,
@@ -144,5 +146,62 @@ impl fmt::Display for PokerHand {
             self.five.0,
             self.five.1
         )
+    }
+}
+
+pub fn poker_hand_to_emojis(hand: PokerHand) -> String {
+    let mut cards = String::new();
+    let mut suites = String::new();
+
+    //set the stuff
+    let mut cs = get_card_suite(hand.one);
+    cards = format!("{}{}", cards, cs.0);
+    suites = format!("{}{}", suites, cs.1);
+
+    cs = get_card_suite(hand.two);
+    cards = format!("{}{}", cards, cs.0);
+    suites = format!("{}{}", suites, cs.1);
+
+    cs = get_card_suite(hand.three);
+    cards = format!("{}{}", cards, cs.0);
+    suites = format!("{}{}", suites, cs.1);
+
+    cs = get_card_suite(hand.four);
+    cards = format!("{}{}", cards, cs.0);
+    suites = format!("{}{}", suites, cs.1);
+
+    cs = get_card_suite(hand.five);
+    cards = format!("{}{}", cards, cs.0);
+    suites = format!("{}{}", suites, cs.1);
+
+    return format!("{}\n{}", cards, suites);
+}
+
+pub fn get_card_suite(cards: (Card, Suite)) -> (String, String) {
+    match cards.1 {
+        Suite::DIAMONDS => {
+            return (
+                RED_CARDS[cards.0 as usize - 1].to_string(),
+                SUITES[cards.1 as usize].to_string(),
+            );
+        }
+        Suite::HEARTS => {
+            return (
+                RED_CARDS[cards.0 as usize - 1].to_string(),
+                SUITES[cards.1 as usize].to_string(),
+            );
+        }
+        Suite::SPADES => {
+            return (
+                BLACK_CARDS[cards.0 as usize - 1].to_string(),
+                SUITES[cards.1 as usize].to_string(),
+            );
+        }
+        Suite::CLUBS => {
+            return (
+                BLACK_CARDS[cards.0 as usize - 1].to_string(),
+                SUITES[cards.1 as usize].to_string(),
+            );
+        }
     }
 }

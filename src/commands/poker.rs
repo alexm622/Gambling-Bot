@@ -7,7 +7,11 @@ use serenity::{
 };
 use tracing::{info, log::warn};
 
-use crate::{errors::GenericError, redis::poker::get_user_hand, sql::structs::PokerHand};
+use crate::{
+    errors::GenericError,
+    redis::poker::get_user_hand,
+    sql::structs::{poker_hand_to_emojis, PokerHand},
+};
 
 const USAGE_GENERAL: &str =
     "the command is poker <command> <args>\n the available commands are as follows:
@@ -83,7 +87,10 @@ pub async fn pplay(ctx: &Context, msg: &Message) -> CommandResult {
     };
     info!("got hand {}", hand);
     msg.channel_id
-        .say(ctx, format!("your hand is: {}", hand.to_string()))
+        .say(
+            ctx,
+            format!("your hand is:\n{}", poker_hand_to_emojis(hand)),
+        )
         .await?;
 
     Ok(())
