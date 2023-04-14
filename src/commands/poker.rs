@@ -175,6 +175,19 @@ pub async fn discard(ctx: &Context, msg: &Message, mut args: Args) -> CommandRes
 }
 
 #[command]
+pub async fn pinfo(ctx: &Context, msg: &Message) -> CommandResult {
+    let hand = get_user_hand(msg.channel_id, msg.author.id).await?;
+
+    msg.reply(
+        ctx,
+        format!("your hand is:\n{}", poker_hand_to_emojis(hand)),
+    )
+    .await?;
+
+    Ok(())
+}
+
+#[command]
 pub async fn check(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     Ok(())
 }

@@ -26,7 +26,7 @@ use utils::cleanup::cleanup;
 
 #[group]
 #[commands(
-    ping, help, roulette, rplay, bal, poker, pplay, discard, check, raise, fold
+    ping, help, roulette, rplay, bal, poker, pplay, pinfo, discard, check, raise, fold
 )]
 struct General;
 
