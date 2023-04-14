@@ -68,19 +68,19 @@ impl fmt::Display for BetResult {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Card {
-    ONE = 1,
-    TWO = 2,
-    THREE = 3,
-    FOUR = 4,
-    FIVE = 5,
-    SIX = 6,
-    SEVEN = 7,
-    EIGHT = 8,
-    NINE = 9,
-    TEN = 10,
-    JACK = 11,
-    QUEEN = 12,
-    KING = 13,
+    ONE = 0,
+    TWO = 1,
+    THREE = 2,
+    FOUR = 3,
+    FIVE = 4,
+    SIX = 5,
+    SEVEN = 6,
+    EIGHT = 7,
+    NINE = 8,
+    TEN = 9,
+    JACK = 10,
+    QUEEN = 11,
+    KING = 12,
 }
 impl fmt::Display for Card {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -181,25 +181,25 @@ pub fn get_card_suite(cards: (Card, Suite)) -> (String, String) {
     match cards.1 {
         Suite::DIAMONDS => {
             return (
-                RED_CARDS[cards.0 as usize - 1].to_string(),
+                RED_CARDS[cards.0 as usize].to_string(),
                 SUITES[cards.1 as usize].to_string(),
             );
         }
         Suite::HEARTS => {
             return (
-                RED_CARDS[cards.0 as usize - 1].to_string(),
+                RED_CARDS[cards.0 as usize].to_string(),
                 SUITES[cards.1 as usize].to_string(),
             );
         }
         Suite::SPADES => {
             return (
-                BLACK_CARDS[cards.0 as usize - 1].to_string(),
+                BLACK_CARDS[cards.0 as usize].to_string(),
                 SUITES[cards.1 as usize].to_string(),
             );
         }
         Suite::CLUBS => {
             return (
-                BLACK_CARDS[cards.0 as usize - 1].to_string(),
+                BLACK_CARDS[cards.0 as usize].to_string(),
                 SUITES[cards.1 as usize].to_string(),
             );
         }

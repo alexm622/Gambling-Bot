@@ -12,27 +12,22 @@ use crate::{
     },
 };
 
-use super::get_conn;
+use super::{get_conn, list_contains};
 
 pub async fn get_user_hand(cid: ChannelId, uid: UserId) -> Result<PokerHand, RedisError> {
-    let mut conn = match get_conn().await {
-        Ok(v) => v,
-        Err(e) => return Err(e),
-    };
+    let mut conn = get_conn().await?;
 
     info!("attemptng to get user {} hand", uid);
     let key_name = format!("poker_{}_{}", cid, uid);
 
     //check if empty
-    let len = match redis::cmd("LLEN")
+    let len = redis::cmd("LLEN")
         .arg(key_name.clone())
-        .query::<u8>(&mut conn)
-    {
-        Ok(v) => v,
-        Err(e) => return Err(e),
-    };
+        .query::<u8>(&mut conn)?;
+    info!("len is {}", len);
 
     if len == 0 {
+        info!("dealing new cards");
         let hand = get_new_poker_hand(cid).await?;
         push_poker_hand(hand, cid, uid).await?;
         return Ok(hand);
@@ -56,7 +51,7 @@ pub async fn get_user_hand(cid: ChannelId, uid: UserId) -> Result<PokerHand, Red
         five: int_to_card(hand_primative.pop().unwrap()),
     };
 
-    push_poker_hand(hand, cid, uid).await?;
+    //push_poker_hand(hand, cid, uid).await?;
     Ok(hand)
 }
 
@@ -92,4 +87,100 @@ pub async fn push_poker_hand(
         Ok(_) => Ok(()),
         Err(e) => Err(e),
     }
+}
+
+pub async fn can_user_discard(uid: UserId, cid: ChannelId) -> Result<bool, RedisError> {
+    let key_name = format!("poker_candiscard_{}", cid);
+
+    Ok(list_contains(key_name, uid.to_string()).await?)
+}
+
+pub async fn activate_can_discard(cid: ChannelId) -> Result<(), RedisError> {
+    let mut conn = get_conn().await?;
+
+    let key_name = format!("poker_candiscard_{}", cid);
+
+    redis::cmd("DEL").arg(key_name.clone()).query(&mut conn)?;
+
+    let uids = hand_keys_to_uid(get_open_hands(cid).await?)?;
+
+    let mut uid_str = String::new();
+
+    for uid in uids {
+        uid_str = format!("{} {}", uid_str, uid);
+    }
+
+    redis::cmd("LPUSH")
+        .arg(key_name)
+        .arg(uid_str)
+        .query(&mut conn)?;
+
+    Ok(())
+}
+
+pub async fn get_open_hands(cid: ChannelId) -> Result<Vec<String>, RedisError> {
+    let mut conn = get_conn().await?;
+
+    let pattern = format!("poker_{}_*", cid);
+
+    Ok(redis::cmd("KEYS")
+        .arg(pattern)
+        .query::<Vec<String>>(&mut conn)?)
+}
+
+pub fn hand_keys_to_uid(hand: Vec<String>) -> Result<Vec<UserId>, RedisError> {
+    let mut uids: Vec<UserId> = Vec::new();
+    hand.clone().into_iter().for_each(|key| {
+        let split: Vec<&str> = key.split("_").collect();
+        uids.push(UserId::from(
+            split.get(1).unwrap().to_string().parse::<u64>().unwrap(),
+        ));
+    });
+
+    Ok(uids)
+}
+
+pub async fn set_can_join(cid: ChannelId) -> Result<(), RedisError> {
+    let mut conn = get_conn().await?;
+
+    let key = format!("poker_joinable_{}", cid);
+
+    Ok(redis::cmd("SET").arg(key).arg(1).query(&mut conn)?)
+}
+
+pub async fn join(cid: ChannelId, uid: UserId) -> Result<(), RedisError> {
+    let mut conn = get_conn().await?;
+
+    let key = format!("poker_joinned_{}", cid);
+
+    if list_contains(key.clone(), uid.to_string()).await? {
+        return Ok(());
+    }
+
+    Ok(redis::cmd("LPUSH").arg(key).arg(uid.0).query(&mut conn)?)
+}
+
+pub async fn is_joinned(uid: UserId, cid: ChannelId) -> Result<bool, RedisError> {
+    let key = format!("poker_joinned_{}", cid);
+
+    Ok(list_contains(key.clone(), uid.to_string()).await?)
+}
+
+pub async fn can_player_join(cid: ChannelId) -> Result<bool, RedisError> {
+    let mut conn = get_conn().await?;
+
+    let key = format!("poker_joinable_{}", cid);
+
+    Ok(redis::cmd("EXISTS")
+        .arg(key)
+        .arg(1)
+        .query::<bool>(&mut conn)?)
+}
+
+pub async fn joinable_close(cid: ChannelId) -> Result<(), RedisError> {
+    let mut conn = get_conn().await?;
+
+    let key = format!("poker_joinable_{}", cid);
+
+    Ok(redis::cmd("DEL").arg(key).query(&mut conn)?)
 }

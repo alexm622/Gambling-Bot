@@ -4,7 +4,7 @@ pub mod deck;
 pub mod poker;
 pub mod roulette;
 
-pub const SIZE_POKER: u8 = 52 * 4;
+pub const SIZE_POKER: u8 = 52;
 
 //convert the gameid in to a name
 pub fn game_id_to_name(game_id: u8) -> String {

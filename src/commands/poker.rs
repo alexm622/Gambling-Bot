@@ -9,7 +9,10 @@ use tracing::{info, log::warn};
 
 use crate::{
     errors::GenericError,
-    redis::poker::get_user_hand,
+    redis::{
+        decks::draw_card,
+        poker::{get_user_hand, push_poker_hand},
+    },
     sql::structs::{poker_hand_to_emojis, PokerHand},
 };
 
@@ -109,6 +112,65 @@ pub async fn deal(uid: UserId, cid: ChannelId) -> Result<PokerHand, GenericError
 
 #[command]
 pub async fn discard(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    let num_args = args.len();
+
+    if num_args == 0 {
+        msg.channel_id
+            .say(ctx, "please enter an integer for discard")
+            .await?;
+        return Ok(());
+    }
+
+    //get the user's hand
+
+    let mut hand = get_user_hand(msg.channel_id, msg.author.id).await?;
+
+    let mut discard: Vec<u8> = Vec::new();
+
+    for _ in 0..num_args {
+        let arg = match args.single::<u8>() {
+            Ok(v) => v,
+            Err(_) => {
+                msg.channel_id
+                    .say(ctx, "please enter an integer for discard")
+                    .await?;
+                return Ok(());
+            }
+        };
+        discard.push(arg);
+    }
+
+    info!("len:{}", num_args);
+
+    discard
+        .clone()
+        .into_iter()
+        .for_each(|va| info!("value of {}", va));
+
+    for i in discard {
+        match i {
+            1 => hand.one = draw_card(msg.channel_id, 0, 1).await?,
+            2 => hand.two = draw_card(msg.channel_id, 0, 1).await?,
+            3 => hand.three = draw_card(msg.channel_id, 0, 1).await?,
+            4 => hand.four = draw_card(msg.channel_id, 0, 1).await?,
+            5 => hand.five = draw_card(msg.channel_id, 0, 1).await?,
+            _ => {
+                msg.channel_id
+                    .say(ctx, format!("{} is not a valid number", i))
+                    .await?;
+                return Ok(());
+            }
+        }
+    }
+    msg.channel_id
+        .say(
+            ctx,
+            format!("your hand is now:\n{}", poker_hand_to_emojis(hand)),
+        )
+        .await?;
+
+    push_poker_hand(hand, msg.channel_id, msg.author.id).await?;
+
     Ok(())
 }
 

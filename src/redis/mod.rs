@@ -42,3 +42,16 @@ pub async fn get_conn() -> Result<redis::Connection, RedisError> {
     };
     Ok(conn)
 }
+
+pub async fn list_contains(key: String, value: String) -> Result<bool, RedisError> {
+    let mut conn = get_conn().await?;
+
+    let len = redis::cmd("LLEN").arg(key.clone()).query::<u8>(&mut conn)?;
+
+    let list = redis::cmd("lrange")
+        .arg(key)
+        .arg(0)
+        .arg(len)
+        .query::<Vec<String>>(&mut conn)?;
+    Ok(list.contains(&value))
+}

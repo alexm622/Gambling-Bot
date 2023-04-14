@@ -19,10 +19,17 @@ impl Deck {
 pub fn generate_deck(size: u8) -> Deck {
     let mut deck = Deck::new();
     info!("attempting to generate a new deck");
+    info!("size: {}", size);
     for i in 0..size {
-        deck.deck.push(int_to_card(i % 52));
+        deck.deck.push(int_to_card(i));
     }
     info!("deck created!");
+
+    deck.deck
+        .clone()
+        .iter()
+        .for_each(|v| info!("card: {}{}", v.0, v.1));
+
     shuffle_deck(&mut deck);
     info!("done shuffling");
     return deck;
@@ -52,22 +59,23 @@ pub fn card_to_int(card: (Card, Suite)) -> u8 {
 
 //convert the int to a enum tuple
 pub fn int_to_card(card_u8: u8) -> (Card, Suite) {
-    let card_u8 = card_u8 % 13 + 1;
-    let suite_u8 = card_u8 % 4;
-    let card = match card_u8 {
-        1 => Card::ONE,
-        2 => Card::TWO,
-        3 => Card::THREE,
-        4 => Card::FOUR,
-        5 => Card::FIVE,
-        6 => Card::SIX,
-        7 => Card::SEVEN,
-        8 => Card::EIGHT,
-        9 => Card::NINE,
-        10 => Card::TEN,
-        11 => Card::JACK,
-        12 => Card::QUEEN,
-        13 => Card::KING,
+    let face_u8 = card_u8 % 13;
+    let suite_u8 = (card_u8 - face_u8) / 13;
+
+    let card = match face_u8 {
+        0 => Card::ONE,
+        1 => Card::TWO,
+        2 => Card::THREE,
+        3 => Card::FOUR,
+        4 => Card::FIVE,
+        5 => Card::SIX,
+        6 => Card::SEVEN,
+        7 => Card::EIGHT,
+        8 => Card::NINE,
+        9 => Card::TEN,
+        10 => Card::JACK,
+        11 => Card::QUEEN,
+        12 => Card::KING,
         v => {
             warn!("something went wrong");
             warn!("got value of: {} for card", v);
