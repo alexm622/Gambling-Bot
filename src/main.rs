@@ -1,12 +1,13 @@
 use std::process::exit;
 
-use serenity::async_trait;
-use serenity::framework::standard::macros::{command, group};
-use serenity::framework::standard::{CommandResult, StandardFramework};
-use serenity::model::channel::Message;
+use serenity::async_trait; 
+
+
+use serenity::model::prelude::Ready;
+use serenity::model::prelude::interaction::{Interaction};
 use serenity::prelude::*;
 
-use tracing::log::{error, warn};
+use tracing::log::{error};
 use tracing::{info, Level};
 use tracing_subscriber::{filter, fmt, prelude::*};
 
@@ -18,22 +19,34 @@ pub mod secrets;
 pub mod sql;
 pub mod utils;
 
-use commands::help::*;
-use commands::money::*;
-use commands::poker::*;
-use commands::roulette::*;
+
 use utils::cleanup::cleanup;
-
-#[group]
-#[commands(
-    ping, help, roulette, rplay, bal, poker, pplay, pinfo, discard, check, raise, fold
-)]
-struct General;
-
+use utils::command_handler::command_handler;
 struct Handler;
 
+//event handler for the bot with slash commands
+
 #[async_trait]
-impl EventHandler for Handler {}
+impl EventHandler for Handler {
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        if let Interaction::ApplicationCommand(command) = interaction {
+            //pass it to the command handler
+            match command_handler(command,&ctx).await{
+                Ok(_) => {}
+                Err(e) => {
+                    error!("Error handling command: {}", e);
+                }
+            };
+        }
+    }
+
+    async fn ready(&self, ctx: Context, _ready: Ready) {
+        //register the slash commands using register_commands
+        if let Err(why) = commands::register_commands(&ctx).await {
+            error!("Could not register commands: {}", why);
+        }
+    }
+}
 
 fn start_tracing() {
     //we just want trace on for my base crate and nothing else
@@ -64,7 +77,7 @@ async fn main() {
     match redis::test_connection().await {
         Ok(_) => info!("Successfully connected to redis"),
         Err(e) => {
-            error!("Could not connect to sql database");
+            error!("Could not connect to redis database");
             error!("{}", e);
             exit(1);
         }
@@ -76,23 +89,24 @@ async fn main() {
         }
         Err(e) => {
             error!("Could not clean up");
+
+            //if e contains the number 10054 then it is likely due to redis being in protected mode
+            if e.to_string().contains("10054") {
+                error!("Redis is in protected mode. Please disable it");
+            }
+
             error!("{}", e);
-            exit(1);
         }
     }
 
-    let framework = StandardFramework::new()
-        .configure(|c| c.prefix("~")) // set the bot's prefix to "~"
-        .group(&GENERAL_GROUP);
 
     // TODO refund all open tables
 
     //get the login token from file
     let key = secrets::get_secret("disc_api");
-    let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;
-    let mut client = Client::builder(key.value, intents)
+
+    let mut client = Client::builder(key.value, GatewayIntents::empty())
         .event_handler(Handler)
-        .framework(framework)
         .await
         .expect("Error creating client");
 
@@ -100,11 +114,4 @@ async fn main() {
     if let Err(why) = client.start().await {
         error!("An error occurred while running the client: {:?}", why);
     }
-}
-
-#[command]
-async fn ping(ctx: &Context, msg: &Message) -> CommandResult {
-    msg.reply(ctx, "Pong!").await?;
-
-    Ok(())
 }

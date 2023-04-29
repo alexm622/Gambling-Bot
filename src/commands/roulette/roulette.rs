@@ -1,6 +1,3 @@
-use serenity::framework::standard::{Args, CommandResult};
-//roulette wheel
-use serenity::framework::standard::macros::command;
 use serenity::model::prelude::{ChannelId, Mention, UserId};
 use serenity::{model::prelude::Message, prelude::Context};
 use tracing::info;
@@ -13,6 +10,8 @@ use crate::sql::insert::insert_roulette_bet;
 use crate::sql::select::get_all_bets;
 use crate::sql::structs::{BetResult, BettingTypes, RouletteBet};
 use crate::utils::roulette::bet_check;
+
+// TODO this all needs tobe migrated to slash commands
 
 const USAGE_GENERAL: &str =
     "the command is roulette <command> <args>\n the available commands are as follows:
@@ -32,7 +31,7 @@ const INVALID_BET: &str = "Invalid value entered for <bet> \n";
 const INVALID_AMOUNT: &str = "Invalid value entered for <amount> \n";
 const INVALID_COMMAND: &str = "Invalid value for <command>\n";
 
-#[command]
+
 pub async fn roulette(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let commands = vec![
         String::from("odds"),
@@ -79,7 +78,7 @@ pub async fn roulette(ctx: &Context, msg: &Message, mut args: Args) -> CommandRe
         }
     }
 }
-#[command]
+
 pub async fn rplay(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let user_id = &msg.author.id;
     //get the bet

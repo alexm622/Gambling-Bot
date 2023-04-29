@@ -1,7 +1,6 @@
 //poker
 
 use serenity::{
-    framework::standard::{macros::command, Args, CommandResult},
     model::prelude::{ChannelId, Message, UserId},
     prelude::Context,
 };
@@ -30,7 +29,7 @@ const INVALID_COMMAND: &str = "Invalid value for <command>\n";
 const CANT_RAISE: &str = "Insufficient funds to raise\n";
 const CONFIRM_FOLD: &str = "Are you sure that you want to fold? (y/n)";
 
-#[command]
+
 pub async fn poker(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let commands = vec![
         String::from("play"),
@@ -78,7 +77,7 @@ pub async fn poker(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
     }
 }
 
-#[command]
+
 pub async fn pplay(ctx: &Context, msg: &Message) -> CommandResult {
     //Message::reply(msg, ctx, "attempting to deal you in").await?;
     let hand = match deal(msg.author.id, msg.channel_id).await {
@@ -110,7 +109,6 @@ pub async fn deal(uid: UserId, cid: ChannelId) -> Result<PokerHand, GenericError
     Ok(hand)
 }
 
-#[command]
 pub async fn discard(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let num_args = args.len();
 
@@ -174,7 +172,7 @@ pub async fn discard(ctx: &Context, msg: &Message, mut args: Args) -> CommandRes
     Ok(())
 }
 
-#[command]
+
 pub async fn pinfo(ctx: &Context, msg: &Message) -> CommandResult {
     let hand = get_user_hand(msg.channel_id, msg.author.id).await?;
 
@@ -187,17 +185,16 @@ pub async fn pinfo(ctx: &Context, msg: &Message) -> CommandResult {
     Ok(())
 }
 
-#[command]
+
 pub async fn check(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     Ok(())
 }
 
-#[command]
+
 pub async fn raise(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     Ok(())
 }
 
-#[command]
 pub async fn fold(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     Ok(())
 }

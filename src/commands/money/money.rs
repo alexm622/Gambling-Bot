@@ -1,7 +1,6 @@
 //money stuff
 
 use serenity::{
-    framework::standard::{macros::command, CommandResult},
     model::prelude::Message,
     prelude::Context,
 };
@@ -9,7 +8,6 @@ use tracing::log::warn;
 
 use crate::redis::users::get_user_bal;
 
-#[command]
 pub async fn bal(ctx: &Context, msg: &Message) -> CommandResult {
     let uid = msg.author.id;
     let bal = match get_user_bal(uid).await {
