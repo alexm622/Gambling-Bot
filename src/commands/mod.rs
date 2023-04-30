@@ -56,7 +56,7 @@ pub async fn register_commands(
                             .kind(CommandOptionType::Integer)
                             .required(true)
                     })
-                    //(red or black) or (odd or even) or an integer (value)
+                    //(red or black) or green or(odd or even) or (low or high) or an integer (value)
                     .create_option(|option| {
                         option
                             .name("bet_type")
@@ -65,15 +65,18 @@ pub async fn register_commands(
                             .required(true)
                             .add_string_choice("red", "red")
                             .add_string_choice("black", "black")
-                            .add_string_choice("odd", "odd")
+                            .add_string_choice("green", "green")
                             .add_string_choice("even", "even")
-                            .add_string_choice("integer", "integer")
+                            .add_string_choice("odd", "odd")
+                            .add_string_choice("low", "low")
+                            .add_string_choice("high", "high")
+                            .add_string_choice("number", "number")
                     })
                     //if bet_type is integer, this is required
                     .create_option(|option| {
                         option
-                            .name("integer")
-                            .description("The integer you want to bet on")
+                            .name("number")
+                            .description("The number you want to bet on")
                             .kind(CommandOptionType::Integer)
                             .required(false)
                     })

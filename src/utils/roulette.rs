@@ -4,13 +4,19 @@ use core::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::sql::structs::BetResult;
+use crate::sql::structs::{BetResult};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct SpinResult {
     pub value: u8,
     pub color: Color,
     pub oddness: bool,
+}
+
+impl fmt::Display for SpinResult{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "Value: {}, Color: {}, Oddness: {}", self.value, self.color, self.oddness)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
@@ -63,47 +69,64 @@ pub fn get_color(rng: u8) -> Color {
     }
 }
 
+// TODO this might not be calculating correctly
 //check all the current bets against the table
 pub fn bet_check(bet: &mut BetResult, spin: SpinResult) {
     match bet.bet_type {
         0 => {
-            if spin.color != Color::RED {
-                bet.net *= -1;
+            if spin.color == Color::RED {
+                bet.net += bet.net;
             } else {
-                bet.net *= 2;
+                bet.net *= -1;
             }
         }
         1 => {
-            if spin.color != Color::BLACK {
-                bet.net *= -1;
+            if spin.color == Color::BLACK {
+                bet.net += bet.net;
             } else {
-                bet.net *= 2;
+                bet.net *= -1;
             }
         }
         2 => {
             if spin.oddness {
-                bet.net *= -1;
+                bet.net += bet.net;
             } else {
-                bet.net *= 2;
+                bet.net *= -1;
             }
         }
         3 => {
             if !spin.oddness {
-                bet.net *= -1;
+                bet.net += bet.net;
             } else {
-                bet.net *= 2;
+                bet.net *= -1;
             }
         }
-        4 => match bet.specific_bet {
-            Some(v) => {
-                if spin.value == v {
-                    bet.net *= 35;
+        4 => {
+            if spin.value <= 18 {
+                bet.net += bet.net;
+            } else {
+                bet.net *= -1;
+            }
+        }
+        5 => {
+            if spin.value >= 19 {
+                bet.net += bet.net;
+            } else {
+                bet.net *= -1;
+            }
+        }
+        6 => {
+            if let Some(specific_bet) = bet.specific_bet {
+                if spin.value == specific_bet {
+                    bet.net += bet.net * 35;
                 } else {
                     bet.net *= -1;
                 }
             }
-            None => {}
-        },
-        _ => {}
+        }
+        _ => {
+            bet.net *= -1;
+        }
     }
+
 }

@@ -2,21 +2,6 @@ use serenity::model::prelude::interaction::application_command::{
     CommandDataOption, CommandDataOptionValue,
 };
 
-//run the command
-pub fn get_odds_string(options: &[CommandDataOption]) -> String {
-    let option = options
-        .get(0)
-        .expect("Expected bet")
-        .resolved
-        .as_ref()
-        .expect("Expected bet value");
-    //option is a string
-    if let CommandDataOptionValue::String(s) = option {
-        return get_odds(s);
-    } else {
-        return String::from("Expected option to be a string");
-    }
-}
 
 //run, return embed
 pub fn get_odds_embed(options: &[CommandDataOption]) -> serenity::builder::CreateEmbed {
@@ -33,6 +18,24 @@ pub fn get_odds_embed(options: &[CommandDataOption]) -> serenity::builder::Creat
         return serenity::builder::CreateEmbed::default();
     }
 }
+
+
+//run the command
+pub fn get_odds_string(options: &[CommandDataOption]) -> String {
+    let option = options
+        .get(0)
+        .expect("Expected bet")
+        .resolved
+        .as_ref()
+        .expect("Expected bet value");
+    //option is a string
+    if let CommandDataOptionValue::String(s) = option {
+        return get_odds(s);
+    } else {
+        return String::from("Expected option to be a string");
+    }
+}
+
 
 //embeds
 fn get_odds_embed_string(option: &str) -> serenity::builder::CreateEmbed {
@@ -60,7 +63,7 @@ fn get_odds(option: &str) -> String {
         _ => {
             if let Ok(i) = option.parse::<i32>() {
                 if i >= 1 && i <= 36 {
-                    return String::from("35:1");
+                    return String::from("35 to 1");
                 }
             }
             String::from("Invalid option")

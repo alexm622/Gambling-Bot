@@ -3,15 +3,16 @@
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
-use serenity::model::prelude::{ChannelId, UserId};
+use serenity::model::prelude::{ChannelId, UserId, GuildId};
 
-use crate::utils::card_ascii::{BLACK_CARDS, RED_CARDS, SUITES};
+use crate::{utils::card_ascii::{BLACK_CARDS, RED_CARDS, SUITES}, commands::roulette::roulette_bet::BettingTypesEnum};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct RouletteBet {
     pub amount: i64,
     pub user_id: UserId,
     pub channel_id: ChannelId,
+    pub guild_id: GuildId,
     pub bet_type: BettingTypes,
     pub specific_bet: Option<u8>,
 }
@@ -39,7 +40,27 @@ pub enum BettingTypes {
     BLACK = 1,
     EVEN = 2,
     ODD = 3,
-    SPECIFIC = 4,
+    LOW = 4,
+    HIGH = 5,
+    SPECIFIC = 6,
+    GREEN = 7,
+    INVALID = 8,
+}
+
+impl BettingTypes {
+    pub fn from_bettingtypeenum(bet_type: BettingTypesEnum) -> BettingTypes {
+        match bet_type {
+            BettingTypesEnum::Red => BettingTypes::RED,
+            BettingTypesEnum::Black => BettingTypes::BLACK,
+            BettingTypesEnum::Green => BettingTypes::GREEN,
+            BettingTypesEnum::Even => BettingTypes::EVEN,
+            BettingTypesEnum::Odd => BettingTypes::ODD,
+            BettingTypesEnum::Low => BettingTypes::LOW,
+            BettingTypesEnum::High => BettingTypes::HIGH,
+            BettingTypesEnum::Specific(_) => BettingTypes::SPECIFIC,
+            BettingTypesEnum::Invalid => BettingTypes::INVALID,
+        }        
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]

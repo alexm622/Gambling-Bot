@@ -7,6 +7,7 @@ use serenity::model::prelude::Ready;
 use serenity::model::prelude::interaction::{Interaction};
 use serenity::prelude::*;
 
+use sql::init_sql;
 use tracing::log::{error};
 use tracing::{info, Level};
 use tracing_subscriber::{filter, fmt, prelude::*};
@@ -73,6 +74,7 @@ async fn main() {
             exit(1);
         }
     }
+    init_sql().await;
 
     match redis::test_connection().await {
         Ok(_) => info!("Successfully connected to redis"),
@@ -114,4 +116,5 @@ async fn main() {
     if let Err(why) = client.start().await {
         error!("An error occurred while running the client: {:?}", why);
     }
+
 }

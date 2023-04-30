@@ -1,7 +1,7 @@
 use serenity::{model::prelude::interaction::application_command::ApplicationCommandInteraction, prelude::Context};
 use tracing::info;
 
-use crate::{errors::GenericError, commands::roulette::roulette_command_handler};
+use crate::{errors::GenericError, commands::{roulette::roulette_command_handler, money::money_command_handler}};
 
 pub async fn command_handler(command: ApplicationCommandInteraction, ctx: &Context) -> Result<(), GenericError>{
     let name = command.data.name.clone();
@@ -9,7 +9,9 @@ pub async fn command_handler(command: ApplicationCommandInteraction, ctx: &Conte
 
     match category{
         CategoriesEnum::Money => {
-            //run the command
+            //send to money command handler
+            info!("money command called");
+            money_command_handler(command, ctx).await?;
         },
         CategoriesEnum::Roulette => {
             //send to roulette command handler
@@ -18,6 +20,7 @@ pub async fn command_handler(command: ApplicationCommandInteraction, ctx: &Conte
         },
         CategoriesEnum::Poker => {
             //run the command
+
         },
         CategoriesEnum::Slots => {
             //run the command

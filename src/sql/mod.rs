@@ -26,8 +26,13 @@ pub async fn init_sql() {
 
     let mut conn = pool.get_conn().await.unwrap();
 
-    //create roulette_bets
-    conn.query_drop(statements::CREATE_ROULETTE_TABLE);
+    info!("creating table if not exists");
+
+    //execute the query to create the table
+    match conn.query_drop(statements::CREATE_ROULETTE_TABLE).await {
+        Ok(_) => info!("table created"),
+        Err(e) => info!("table already exists: {}", e),
+    };
 }
 
 //test connection to mysql

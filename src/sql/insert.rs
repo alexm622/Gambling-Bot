@@ -20,7 +20,7 @@ pub async fn insert_roulette_bet(bet: RouletteBet) -> Result<(), GenericError> {
         Err(e) => return Err(GenericError::new(&e.to_string().clone())),
     };
 
-    let balance: i64 = match get_user_bal(bet.user_id).await {
+    let balance: i64 = match get_user_bal(bet.user_id, bet.guild_id).await {
         Ok(v) => v,
         Err(e) => return Err(GenericError::new(&e.to_string().clone())),
     };
@@ -37,13 +37,14 @@ pub async fn insert_roulette_bet(bet: RouletteBet) -> Result<(), GenericError> {
                 "amount" => bet.amount,
                 "user_id" => bet.user_id.0,
                 "channel_id" => bet.channel_id.0,
+                "guild_id" => bet.guild_id.0,
                 "bet_type" => bet.bet_type as u8,
                 "specific_bet" => bet.specific_bet,
             },
         )
         .await
     {
-        Ok(_) => match set_bal(bet.user_id, new_balance).await {
+        Ok(_) => match set_bal(bet.user_id, bet.guild_id, new_balance).await {
             Ok(_) => Ok(()),
             Err(e) => return Err(GenericError::new(&e.to_string().clone())),
         },

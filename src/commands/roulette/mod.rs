@@ -3,11 +3,13 @@ use serenity::{
     prelude::Context,
 };
 
-use tracing::trace;
+use tracing::{trace, warn};
 
 use crate::errors::GenericError;
 
+pub mod roulette_bet;
 pub mod roulette_odds;
+
 
 pub async fn roulette_command_handler(
     command: ApplicationCommandInteraction,
@@ -16,8 +18,25 @@ pub async fn roulette_command_handler(
     let name = command.data.name.clone();
 
     match RouletteCommandsEnum::from_str(&name) {
+        // place a bet
         RouletteCommandsEnum::Roulette => {
-            
+            trace!("roulette called");
+            let embed = roulette_bet::get_bet_embed(&command.data.options, command.user.id, command.channel_id, command.guild_id.unwrap(), ctx).await.map_err(|e| {
+                warn!("error getting bet embed: {}", e);
+                return GenericError::new(&format!("error getting bet embed: {}", e));
+            })?;
+            match command.create_interaction_response(ctx, |response| {
+                response.kind(serenity::model::prelude::interaction::InteractionResponseType::ChannelMessageWithSource);
+                response.interaction_response_data(|message| {
+                    message.add_embed(embed)
+                })
+            }).await{
+                Ok(_) => {return Ok(())},
+                Err(e) => {
+                    warn!("error sending response: {}", e);
+                    return Err(GenericError::new(&format!("error sending response: {}", e)));
+                }
+            }         
         }
         RouletteCommandsEnum::RouletteOdds => {
             trace!("roulette odds called");
@@ -30,7 +49,7 @@ pub async fn roulette_command_handler(
             }).await{
                 Ok(_) => {return Ok(())},
                 Err(e) => {
-                    println!("error sending response: {}", e);
+                    warn!("error sending response: {}", e);
                     return Err(GenericError::new(&format!("error sending response: {}", e)));
                 }
             }

@@ -11,7 +11,8 @@ use crate::sql::select::get_all_bets;
 use crate::sql::structs::{BetResult, BettingTypes, RouletteBet};
 use crate::utils::roulette::bet_check;
 
-// TODO this all needs tobe migrated to slash commands
+// TODO this all needs to be migrated to slash commands
+// UPDATE this is mostly done, but needs to be tested and fleshed out
 
 const USAGE_GENERAL: &str =
     "the command is roulette <command> <args>\n the available commands are as follows:
