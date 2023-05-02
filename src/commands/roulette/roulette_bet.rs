@@ -1,21 +1,16 @@
 use serde::{Deserialize, Serialize};
-use serenity::model::{
-    prelude::{
-        interaction::application_command::{CommandDataOptionValue, CommandDataOption}, ChannelId, GuildId,
-        UserId,
-    },
+use serenity::model::prelude::{
+    interaction::application_command::{CommandDataOption, CommandDataOptionValue},
+    ChannelId, GuildId, UserId,
 };
 use tracing::warn;
 
 use crate::{
-    redis::{roulette::spin_table},
+    redis::roulette::spin_table,
     sql::{
-
         insert::insert_roulette_bet,
-
         structs::{BettingTypes, RouletteBet},
     },
-
 };
 
 pub async fn get_bet_embed(
@@ -28,84 +23,90 @@ pub async fn get_bet_embed(
     //get bet amount
 
     let bet_amount: i64;
-    match options.get(0){
-        Some(v) => {
-            match v.resolved.as_ref(){
-                Some(v) => {
-                    match v{
-                        CommandDataOptionValue::Integer(i) => {
-                            bet_amount = *i;
-                        }
-                        _ => {
-                            return Err(String::from("Expected option to be an integer"));
-                        }
-                    }
+    match options.get(0) {
+        Some(v) => match v.resolved.as_ref() {
+            Some(v) => match v {
+                CommandDataOptionValue::Integer(i) => {
+                    bet_amount = *i;
                 }
-                None => {
+                _ => {
                     return Err(String::from("Expected option to be an integer"));
                 }
+            },
+            None => {
+                return Err(String::from("Expected option to be an integer"));
             }
-        }
+        },
         None => {
             return Err(String::from("Expected option to be an integer"));
         }
     };
     let mut bet_type: BettingTypesEnum;
 
-    match options.get(1){
-        Some(v) => {
-            match v.resolved.as_ref(){
-                Some(v) => {
-                    match v{
-                        CommandDataOptionValue::String(s) => {
-                            bet_type = BettingTypesEnum::from_str(&s);
-                        }
-                        _ => {
-                            return Err(String::from("Expected option to be a string"));
-                        }
-                    }
+    match options.get(1) {
+        Some(v) => match v.resolved.as_ref() {
+            Some(v) => match v {
+                CommandDataOptionValue::String(s) => {
+                    bet_type = BettingTypesEnum::from_str(&s);
                 }
-                None => {
+                _ => {
                     return Err(String::from("Expected option to be a string"));
                 }
+            },
+            None => {
+                return Err(String::from("Expected option to be a string"));
             }
-        }
+        },
         None => {
             return Err(String::from("Expected option to be a string"));
         }
     };
 
     //parse for specific bet
-    match options.get(2){
-        Some(v) => {
-            match v.resolved.as_ref(){
-                Some(v) => {
-                    match v{
-                        CommandDataOptionValue::Integer(i) => {
-                            BettingTypesEnum::set_specific(&mut bet_type,i.clone() as u8);
-                        }
-                        _ => {
-                            return Err(String::from("Expected option to be an integer"));
-                        }
+    if bet_type.derive_integer() == 8{
+        match options.get(2) {
+            Some(v) => match v.resolved.as_ref() {
+                Some(v) => match v {
+                    CommandDataOptionValue::Integer(i) => {
+                        bet_type = BettingTypesEnum::Specific(*i as u8);
                     }
-                }
+                    _ => {
+                        return Err(String::from("Expected option to be an integer"));
+                    }
+                },
                 None => {
                     return Err(String::from("Expected option to be an integer"));
                 }
+            },
+            None => {
+                return Err(String::from("Expected option to be an integer"));
             }
-        }
-        None => {}
-    };
+        };
+    }
+
+    if bet_type == BettingTypesEnum::Invalid {
+        //create a fail embed
+        let mut embed = serenity::builder::CreateEmbed::default();
+        embed.title("Invalid Bet Type");
+        embed.description("The bet type you have entered is invalid. Please try again.");
+        embed.color(serenity::utils::Colour::from_rgb(255, 0, 0));
+        return Ok(embed);
+    }
 
     //this below halts
-    bet_handler(uid, cid, guild, bet_amount, bet_type.clone(), ctx).await.expect("error placing bet");
+    bet_handler(uid, cid, guild, bet_amount, bet_type.clone(), ctx)
+        .await
+        .expect("error placing bet");
 
     let mut embed = serenity::builder::CreateEmbed::default();
     embed.title("Bet Placed!");
-    embed.description(format!("You have placed a bet of {} on {}!", bet_amount, bet_type.to_string()));
+    embed.description(format!(
+        "You have placed a bet of {} on {}!",
+        bet_amount,
+        bet_type.to_string()
+    ));
     embed.color(serenity::utils::Colour::from_rgb(255, 0, 0));
     Ok(embed)
-
 }
 
 pub async fn bet_handler(
@@ -116,7 +117,6 @@ pub async fn bet_handler(
     bet_type: BettingTypesEnum,
     ctx: &serenity::client::Context,
 ) -> Result<(), String> {
-
     let specific_bet: Option<u8> = bet_type.get_specific();
 
     let bet: RouletteBet = RouletteBet {
@@ -133,7 +133,7 @@ pub async fn bet_handler(
             warn!("unable to place bet {}", e);
             return Ok(());
         }
-        Ok(_) => {},
+        Ok(_) => {}
     };
 
     let _spin = spin_table(guild, cid, ctx.clone()).await;
@@ -186,6 +186,21 @@ impl BettingTypesEnum {
 
     pub fn set_specific(&mut self, v: u8) {
         *self = BettingTypesEnum::Specific(v);
+    }
+
+    //return a unique id for the bet type
+    pub fn derive_integer(&mut self) -> u8{
+        match self {
+            BettingTypesEnum::Red => 1,
+            BettingTypesEnum::Black => 2,
+            BettingTypesEnum::Green => 3,
+            BettingTypesEnum::Even => 4,
+            BettingTypesEnum::Odd => 5,
+            BettingTypesEnum::Low => 6,
+            BettingTypesEnum::High => 7,
+            BettingTypesEnum::Specific(_v) => 8,
+            BettingTypesEnum::Invalid => 0,
+        }        
     }
 }
 
