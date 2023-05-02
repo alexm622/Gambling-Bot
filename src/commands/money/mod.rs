@@ -8,6 +8,8 @@ use tracing::{trace, warn};
 
 pub mod bal;
 
+
+
 pub async fn money_command_handler(
     command: ApplicationCommandInteraction,
     ctx: &Context,
@@ -15,16 +17,17 @@ pub async fn money_command_handler(
     let name = command.data.name.clone();
 
     trace!("money command called: {}", name);
+    trace!("balance called");
+    let guild_id = command.clone().guild_id.unwrap();
+    let user = command.clone().user;
+
+    trace!("guild id: {:?}", guild_id);
+    trace!("user: {:?}", user);
+
 
     match MoneyCommandsEnum::from_str(&name) {
         MoneyCommandsEnum::Balance => {
-            trace!("balance called");
-            let guild_id = command.clone().guild_id.unwrap();
-            let user = command.clone().user;
-
-            trace!("guild id: {:?}", guild_id);
-            trace!("user: {:?}", user);
-
+            
             let embed = bal::get_bal_embed(&command.data.options, guild_id, user).await.expect("error getting balance embed");
             match command.create_interaction_response(ctx, |response| {
                 response.kind(serenity::model::prelude::interaction::InteractionResponseType::ChannelMessageWithSource);

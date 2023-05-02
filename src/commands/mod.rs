@@ -43,6 +43,7 @@ pub async fn register_commands(
             .create_application_command(|command| {
                 command.name("reset_bal").description("Reset your balance")
             })
+            // 
             //ROULETTE COMMANDS
             //roulette bet
             .create_application_command(|command| {
@@ -102,29 +103,87 @@ pub async fn register_commands(
                     .name("roulette_table")
                     .description("View the bets on the table")
             })
+            //
+            // POKER COMMANDS
+            //poker draw
             .create_application_command(|command| {
                 command
-                    .name("poker")
-                    .description("Play poker")
+                    .name("pdraw")
+                    .description("Draw cards for poker")
+            })
+            //poker fold
+            .create_application_command(|command| {
+                command
+                    .name("pfold")
+                    .description("Fold your hand for poker")
+            })
+            //poker hand
+            .create_application_command(|command| {
+                command
+                    .name("phand")
+                    .description("View your hand for poker")
+            })
+            //poker raise
+            .create_application_command(|command| {
+                command
+                    .name("praise")
+                    .description("Raise your bet for poker")
                     .create_option(|option| {
                         option
                             .name("bet")
-                            .description("The amount you want to bet")
+                            .description("The amount you want to raise your bet by")
                             .kind(CommandOptionType::Integer)
                             .required(true)
                     })
             })
+            //poker call
             .create_application_command(|command| {
                 command
-                    .name("blackjack")
-                    .description("Play blackjack")
+                    .name("pcall")
+                    .description("Call the current bet for poker")
+            })
+            //poker check
+            .create_application_command(|command| {
+                command
+                    .name("pcheck")
+                    .description("Check the current bet for poker")
+            })
+            //poker all in
+            .create_application_command(|command| {
+                command
+                    .name("pallin")
+                    .description("Go all in for poker")
+            })
+            //poker discard
+            .create_application_command(|command| {
+                command
+                    .name("pdiscard")
+                    .description("Discard cards for poker")
                     .create_option(|option| {
                         option
-                            .name("bet")
-                            .description("The amount you want to bet")
-                            .kind(CommandOptionType::Integer)
+                            .name("cards")
+                            .description("The cards you want to discard")
+                            .kind(CommandOptionType::String)
                             .required(true)
                     })
+            })
+            //poker start
+            .create_application_command(|command| {
+                command
+                    .name("pstart")
+                    .description("Start a game of poker")
+            })
+            //poker join
+            .create_application_command(|command| {
+                command
+                    .name("pjoin")
+                    .description("Join a game of poker")
+            })
+            //poker leave
+            .create_application_command(|command| {
+                command
+                    .name("pleave")
+                    .description("Leave a game of poker")
             })
             //MOD COMMANDS
             //reset user balance
