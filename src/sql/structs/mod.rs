@@ -5,7 +5,7 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 use serenity::model::prelude::{ChannelId, UserId, GuildId};
 
-use crate::{utils::card_ascii::{BLACK_CARDS, RED_CARDS, SUITES}, commands::roulette::roulette_bet::BettingTypesEnum};
+use crate::{utils::card_ascii::{BLACK_CARDS, RED_CARDS, SUITES}, commands::roulette::roulette_bet::BettingTypesEnum, redis::decks::draw_card};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct RouletteBet {
@@ -170,9 +170,69 @@ impl fmt::Display for PokerHand {
     }
 }
 
+impl PokerHand {
+    pub fn emoji_vec(&self) -> Vec<(String, String)>{
+        let mut emojis: Vec<(String, String)> = Vec::new();
+        
+        let mut cs = get_card_suite(self.one);
+        emojis.push(cs);
+
+        cs = get_card_suite(self.two);
+        emojis.push(cs);
+
+        cs = get_card_suite(self.three);
+        emojis.push(cs);
+
+        cs = get_card_suite(self.four);
+        emojis.push(cs);
+
+        cs = get_card_suite(self.five);
+        emojis.push(cs);
+
+        return emojis;
+    }
+
+    pub async fn discard(&mut self,cards: String, uid:UserId, gid: GuildId, cid: ChannelId) -> Result<(), String>{
+
+        //go through the cards and discard them
+
+        for c in cards.chars(){
+            let card = match c.to_digit(10){
+                Some(n) => n,
+                None => return Err(String::from("Invalid card")),
+            };
+
+            //see if anything is being discarded
+            if card == 0{
+                continue;
+            }
+
+            //using draw_card to get the card
+            let new_card = match draw_card(gid, cid, 0, 1).await{
+                Ok(c) => c,
+                Err(e) => return Err(e.to_string()),
+            };
+
+            //replace the card
+            match card{
+                1 => self.one = new_card,
+                2 => self.two = new_card,
+                3 => self.three = new_card,
+                4 => self.four = new_card,
+                5 => self.five = new_card,
+                _ => return Err(String::from("Invalid card")),
+            }
+        }
+        Ok(())
+    }
+}
+
 pub fn poker_hand_to_emojis(hand: PokerHand) -> String {
     let mut cards = String::new();
     let mut suites = String::new();
+
+    
+
 
     //set the stuff
     let mut cs = get_card_suite(hand.one);

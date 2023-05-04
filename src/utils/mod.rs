@@ -2,6 +2,7 @@ pub mod card_ascii;
 pub mod cleanup;
 pub mod deck;
 pub mod command_handler;
+pub mod component_handler;
 
 pub mod poker;
 pub mod roulette;

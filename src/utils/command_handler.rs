@@ -74,7 +74,7 @@ fn command_to_category(command: &str) -> CategoriesEnum {
     match command {
         "bal" | "reset_bal" | "reset_user_bal" => CategoriesEnum::Money,
         "roulette" | "roulette_odds" | "roulette_table" => CategoriesEnum::Roulette,
-        "poker"|"pdraw"| "phand" => CategoriesEnum::Poker,
+        "poker"|"pdraw"| "phand" | "pdiscard" => CategoriesEnum::Poker,
         "slots" => CategoriesEnum::Slots,
         "blackjack" => CategoriesEnum::Blackjack,
         _ => CategoriesEnum::InvalidCategory

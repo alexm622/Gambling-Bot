@@ -23,6 +23,7 @@ pub mod utils;
 
 use utils::cleanup::cleanup;
 use utils::command_handler::command_handler;
+use utils::component_handler::component_handler;
 struct Handler;
 
 //event handler for the bot with slash commands
@@ -36,6 +37,14 @@ impl EventHandler for Handler {
                 Ok(_) => {}
                 Err(e) => {
                     error!("Error handling command: {}", e);
+                }
+            };
+        }else if let Interaction::MessageComponent(component) = interaction{
+            //pass it to the component handler
+            match component_handler(component, &ctx).await{
+                Ok(_) => {}
+                Err(e) => {
+                    error!("Error handling component: {}", e);
                 }
             };
         }

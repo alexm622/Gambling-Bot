@@ -1,4 +1,4 @@
-use crate::errors::GenericError;
+use crate::{errors::GenericError, commands::poker::poker_discard::poker_discard_handler};
 use serenity::{
     model::prelude::{interaction::{application_command::ApplicationCommandInteraction, MessageFlags, InteractionResponseType}},
     prelude::Context,
@@ -7,6 +7,7 @@ use serenity::{
 use tracing::{trace, warn};
 
 pub mod poker_draw;
+pub mod poker_discard;
 
 
 
@@ -33,8 +34,10 @@ pub async fn poker_command_handler(
         PokerCommandsEnum::Call => {
             //run the command
         }
-        PokerCommandsEnum::Discard(v) => {
+        PokerCommandsEnum::Discard(_v) => {
+            trace!("poker discard command called");
             //run the command
+            poker_discard_handler(command, ctx).await.expect("error handling poker discard command");
         }
         PokerCommandsEnum::Draw => {
             //run the command
@@ -83,7 +86,19 @@ pub async fn poker_command_handler(
             //run the command
         }
         PokerCommandsEnum::InvalidCommand => {
-            //run the command
+            //respond with an ephemeral message saying invalid command
+
+            warn!("invalid command called");
+
+            command.create_interaction_response(&ctx.http, |response| {
+                response
+                    .kind(InteractionResponseType::ChannelMessageWithSource)
+                    .interaction_response_data(|message| message
+                        .content("Invalid Command")
+                        .flags(MessageFlags::EPHEMERAL)
+                    )
+            }).await.expect("error sending invalid command embed");
+
         }
     }
 
