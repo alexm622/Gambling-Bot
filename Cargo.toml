@@ -19,4 +19,4 @@ rand = "0.8.5"
 default-features = false
 #builder, cache, client, gateway, http, model, utils, and rustls_backend
 features = ["client", "gateway", "http", "model", "utils", "rustls_backend", "cache", "builder"]
-ver = "0.11.5"
+version = "0.11.5"

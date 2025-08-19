@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  rust_app:
+    build: .
+    container_name: rust_app
+    depends_on:
+      - redis
+      - mysql
+    environment:
+      - REDIS_HOST=redis
+      - MYSQL_HOST=mysql
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=password
+      - MYSQL_DATABASE=my_database
+    networks:
+      - backend
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - backend
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: my_database
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    ports:
+      - "3306:3306"
+    networks:
+      - backend
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  mysql_data:
