@@ -1,7 +1,6 @@
 use serenity::model::prelude::{ChannelId, Mention, UserId};
 use serenity::{model::prelude::Message, prelude::Context};
-use tracing::info;
-use tracing::log::warn;
+use tracing::{info, warn};
 
 use crate::redis::roulette::spin_table;
 use crate::redis::users::apply_winnings;

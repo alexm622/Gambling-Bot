@@ -1,4 +1,10 @@
-use serenity::model::{prelude::{UserId, GuildId, interaction::application_command::{CommandDataOptionValue, CommandDataOption}}, user::User};
+use serenity::model::{
+    prelude::{
+        interaction::application_command::{CommandDataOption, CommandDataOptionValue},
+        GuildId, UserId,
+    },
+    user::User,
+};
 
 pub async fn get_bal_embed(
     options: &[CommandDataOption],
@@ -6,37 +12,29 @@ pub async fn get_bal_embed(
     origin: User,
 ) -> Result<serenity::builder::CreateEmbed, String> {
     //see if there is a user specified
-    
+
     let user: User;
 
-    let option =  options.get(0);
+    let option = options.get(0);
 
-    match option{
-        Some(v) =>{
-            match v.resolved.as_ref(){
-                Some(v) => {
-                    match v{
-                        CommandDataOptionValue::User(u,_) => {
-                            user = u.clone();
-                        }
-                        _ => {
-                            return Err(String::from("Expected option to be a user"));
-                        }
-                    }
+    match option {
+        Some(v) => match v.resolved.as_ref() {
+            Some(v) => match v {
+                CommandDataOptionValue::User(u, _) => {
+                    user = u.clone();
                 }
-                None => {
-                    user = origin;
+                _ => {
+                    return Err(String::from("Expected option to be a user"));
                 }
+            },
+            None => {
+                user = origin;
             }
-        }
+        },
         None => {
             user = origin;
         }
     }
-
-
-    
-    
 
     let bal = match get_bal(user.id, guild_id).await {
         Ok(v) => v,

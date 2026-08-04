@@ -1,12 +1,8 @@
 use serenity::prelude::SerenityError;
 use serenity::{
-    model::prelude::{
-        command::{Command, CommandOptionType},
-    },
+    model::prelude::command::{Command, CommandOptionType},
     prelude::Context,
 };
-
-
 
 pub mod blackjack;
 pub mod money;
@@ -43,7 +39,7 @@ pub async fn register_commands(
             .create_application_command(|command| {
                 command.name("reset_bal").description("Reset your balance")
             })
-            // 
+            //
             //ROULETTE COMMANDS
             //roulette bet
             .create_application_command(|command| {
@@ -107,9 +103,7 @@ pub async fn register_commands(
             // POKER COMMANDS
             //poker draw
             .create_application_command(|command| {
-                command
-                    .name("pdraw")
-                    .description("Draw cards for poker")
+                command.name("pdraw").description("Draw cards for poker")
             })
             //poker fold
             .create_application_command(|command| {
@@ -150,9 +144,7 @@ pub async fn register_commands(
             })
             //poker all in
             .create_application_command(|command| {
-                command
-                    .name("pallin")
-                    .description("Go all in for poker")
+                command.name("pallin").description("Go all in for poker")
             })
             //poker discard
             .create_application_command(|command| {
@@ -169,21 +161,15 @@ pub async fn register_commands(
             })
             //poker start
             .create_application_command(|command| {
-                command
-                    .name("pstart")
-                    .description("Start a game of poker")
+                command.name("pstart").description("Start a game of poker")
             })
             //poker join
             .create_application_command(|command| {
-                command
-                    .name("pjoin")
-                    .description("Join a game of poker")
+                command.name("pjoin").description("Join a game of poker")
             })
             //poker leave
             .create_application_command(|command| {
-                command
-                    .name("pleave")
-                    .description("Leave a game of poker")
+                command.name("pleave").description("Leave a game of poker")
             })
             //MOD COMMANDS
             //reset user balance

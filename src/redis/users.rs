@@ -1,7 +1,7 @@
 //users
 
 use redis::RedisError;
-use serenity::model::prelude::{UserId, GuildId};
+use serenity::model::prelude::{GuildId, UserId};
 use tracing::log::warn;
 
 use crate::sql::structs::BetResult;
@@ -58,7 +58,7 @@ pub async fn create_user(id: UserId, gid: GuildId) -> Result<(), RedisError> {
 }
 
 //set the balance of a user
-pub async fn set_bal(id: UserId, gid: GuildId,bal: i64) -> Result<(), RedisError> {
+pub async fn set_bal(id: UserId, gid: GuildId, bal: i64) -> Result<(), RedisError> {
     let mut conn = match get_conn().await {
         Ok(v) => v,
         Err(e) => return Err(e),

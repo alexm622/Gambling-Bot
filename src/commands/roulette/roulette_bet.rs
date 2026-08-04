@@ -63,7 +63,7 @@ pub async fn get_bet_embed(
     };
 
     //parse for specific bet
-    if bet_type.derive_integer() == 8{
+    if bet_type.derive_integer() == 8 {
         match options.get(2) {
             Some(v) => match v.resolved.as_ref() {
                 Some(v) => match v {
@@ -189,7 +189,7 @@ impl BettingTypesEnum {
     }
 
     //return a unique id for the bet type
-    pub fn derive_integer(&mut self) -> u8{
+    pub fn derive_integer(&mut self) -> u8 {
         match self {
             BettingTypesEnum::Red => 1,
             BettingTypesEnum::Black => 2,
@@ -200,7 +200,7 @@ impl BettingTypesEnum {
             BettingTypesEnum::High => 7,
             BettingTypesEnum::Specific(_v) => 8,
             BettingTypesEnum::Invalid => 0,
-        }        
+        }
     }
 }
 

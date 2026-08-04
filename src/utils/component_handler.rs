@@ -1,33 +1,40 @@
-use serenity::{model::prelude::interaction::{message_component::MessageComponentInteraction, InteractionResponseType}, prelude::Context};
-use tracing::info;
+use serenity::{
+    model::prelude::interaction::{
+        message_component::MessageComponentInteraction, InteractionResponseType,
+    },
+    prelude::Context,
+};
+use tracing::{info, warn};
 
-use crate::errors::GenericError;
+use crate::{commands::poker::components::handle_poker_component, errors::GenericError};
 
-pub async fn component_handler(component: MessageComponentInteraction, ctx: &Context) -> Result<(), GenericError>{
-
+pub async fn component_handler(
+    component: MessageComponentInteraction,
+    ctx: &Context,
+) -> Result<(), GenericError> {
     info!("component handler called");
 
-    info!("component: {:?}", component);
+    let _data = component.data.clone();
+    let _uid = component.user.id;
+    let _cid = component.channel_id;
+    let _gid = component.guild_id;
+    let _mid = component.message.id;
 
-    //basics: uid, cid, gid, mid, data
+    // route poker buttons by custom_id prefix
+    if component.data.custom_id.starts_with("poker:") {
+        return handle_poker_component(&component, ctx).await;
+    }
 
-    let data = component.data.clone();
-    let uid = component.user.id;
-    let cid = component.channel_id;
-    let gid = component.guild_id;
-    let mid = component.message.id;
+    warn!("unhandled component: {}", component.data.custom_id);
 
-
-
-    //reply with a message saying the component was clicked
-
-    component.create_interaction_response(&ctx.http, |response| {
-        response
-            .kind(InteractionResponseType::ChannelMessageWithSource)
-            .interaction_response_data(|message| message
-                .content("component clicked")
-            )
-    }).await.expect("error sending component clicked message");
+    component
+        .create_interaction_response(&ctx.http, |response| {
+            response
+                .kind(InteractionResponseType::ChannelMessageWithSource)
+                .interaction_response_data(|message| message.content("Unknown button"))
+        })
+        .await
+        .expect("error sending component clicked message");
 
     Ok(())
 }

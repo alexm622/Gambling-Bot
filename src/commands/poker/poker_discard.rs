@@ -1,102 +1,132 @@
 use serenity::{
-    model::{
-        prelude::{
-            interaction::{application_command::ApplicationCommandInteraction, InteractionResponseType, MessageFlags}, ChannelId, GuildId, component::ButtonStyle,
-        },
-        user::User,
+    model::prelude::interaction::{
+        application_command::{ApplicationCommandInteraction, CommandDataOptionValue},
+        InteractionResponseType, MessageFlags,
     },
-    prelude::Context, builder::{CreateButton, CreateEmbed, },
+    prelude::Context,
 };
+use tracing::trace;
 
-use crate::{
-    errors::GenericError, redis::poker::{get_user_hand,}, sql::structs::{PokerHand},
-};
+use crate::{errors::GenericError, redis::poker, sql::structs::poker_hand_to_emojis};
 
 pub async fn poker_discard_handler(
-    command: ApplicationCommandInteraction,
+    command: &ApplicationCommandInteraction,
     ctx: &Context,
 ) -> Result<(), GenericError> {
-    let guild_id = command.clone().guild_id.unwrap();
-    let user = command.clone().user;
-    let cid = command.clone().channel_id;
+    let guild_id = command
+        .guild_id
+        .ok_or(GenericError::new(&"Guild ID not found"))?;
+    let cid = command.channel_id;
+    let uid = command.user.id;
 
-    let embed:CreateEmbed = get_poker_discard_embed_initial(guild_id, cid, user)
+    trace!("poker discard command called by {}", uid);
+
+    if !poker::is_joinned(uid, guild_id, cid)
         .await
-        .expect("error getting poker discard embed");
-
-    //create buttons 1-5
-
-    let buttons = create_buttons();
-
-    //create button row
-
-    let mut button_row = serenity::builder::CreateActionRow::default();
-
-    for button in buttons {
-        button_row.add_button(button);
+        .map_err(|e| GenericError::new(&e.to_string()))?
+    {
+        respond_ephemeral(command, ctx, "You are not in this poker game.").await?;
+        return Ok(());
     }
 
+    let cards = match get_cards_option(&command.data.options) {
+        Some(v) => v,
+        None => {
+            respond_ephemeral(
+                command,
+                ctx,
+                "Please provide the cards you want to discard (e.g. `1 3 5`).",
+            )
+            .await?;
+            return Ok(());
+        }
+    };
 
-    //send message
+    // normalize to a string of unique digits 1-5, e.g. "135"
+    let normalized = normalize_discard_input(&cards);
 
-    command.create_interaction_response(&ctx.http, |response| {
-        response
-            .kind(InteractionResponseType::ChannelMessageWithSource)
-            .interaction_response_data(|m| {
-                m.flags(MessageFlags::EPHEMERAL)
-                    .add_embed(embed)
-                    .components(|c| c.add_action_row(button_row))
-            })
-    }).await.expect("error sending poker discard embed");
-    
+    if normalized.is_empty() {
+        respond_ephemeral(
+            command,
+            ctx,
+            "No valid cards selected. Use digits 1-5 (e.g. `1 3 5`).",
+        )
+        .await?;
+        return Ok(());
+    }
+
+    let mut hand = poker::get_user_hand(guild_id, cid, uid)
+        .await
+        .map_err(|e| GenericError::new(&e.to_string()))?;
+
+    hand.discard(normalized, uid, guild_id, cid)
+        .await
+        .map_err(|e| GenericError::new(&e))?;
+
+    poker::push_poker_hand(hand, guild_id, cid, uid)
+        .await
+        .map_err(|e| GenericError::new(&e.to_string()))?;
+
+    let embed = serenity::builder::CreateEmbed::default()
+        .title("Poker Discard")
+        .description(format!("Your new hand:\n{}", poker_hand_to_emojis(hand)))
+        .color(serenity::utils::Colour::DARK_GREEN)
+        .to_owned();
+
+    command
+        .create_interaction_response(&ctx.http, |response| {
+            response
+                .kind(InteractionResponseType::ChannelMessageWithSource)
+                .interaction_response_data(|m| {
+                    m.content("Cards discarded!")
+                        .add_embed(embed)
+                        .flags(MessageFlags::EPHEMERAL)
+                })
+        })
+        .await
+        .map_err(|e| GenericError::new(&e.to_string()))?;
+
     Ok(())
-
 }
 
-async fn get_poker_discard_embed_initial(
-    guild_id: GuildId,
-    cid: ChannelId,
-    user: User,
-) -> Result<serenity::builder::CreateEmbed, String> {
-    let mut embed = serenity::builder::CreateEmbed::default();
-    embed.title("Poker Discard");
+fn get_cards_option(
+    options: &[serenity::model::prelude::interaction::application_command::CommandDataOption],
+) -> Option<String> {
+    for opt in options {
+        if opt.name == "cards" {
+            if let Some(CommandDataOptionValue::String(s)) = opt.resolved.as_ref() {
+                return Some(s.clone());
+            }
+        }
+    }
+    None
+}
 
-    //your hand
+fn normalize_discard_input(input: &str) -> String {
+    let mut seen = [false; 5];
+    let mut result = String::new();
+    for c in input.chars() {
+        if let Some(d) = c.to_digit(10) {
+            if (1..=5).contains(&d) && !seen[d as usize - 1] {
+                seen[d as usize - 1] = true;
+                result.push(c);
+            }
+        }
+    }
+    result
+}
 
-    let hand: PokerHand = get_user_hand(guild_id, cid, user.id)
+async fn respond_ephemeral(
+    command: &ApplicationCommandInteraction,
+    ctx: &Context,
+    content: &str,
+) -> Result<(), GenericError> {
+    command
+        .create_interaction_response(&ctx.http, |response| {
+            response
+                .kind(InteractionResponseType::ChannelMessageWithSource)
+                .interaction_response_data(|m| m.content(content).flags(MessageFlags::EPHEMERAL))
+        })
         .await
-        .expect("error getting user hand");
-
-    //create a string matching the emojis of the hand with the numbers 1-5
-    let emojis = hand.emoji_vec();
-
-    let mut hand_str = String::new();
-    
-    for (i, emoji) in emojis.iter().enumerate() {
-        hand_str.push_str(&format!("{}:\n {}\n{}\n", i+1, emoji.0,emoji.1));
-    }
-
-    let embed_description = format!("Your hand: \n {}", hand_str);
-
-    //add hand_str to embed
-    embed.description(&embed_description);
-
-    return Ok(embed);
+        .map_err(|e| GenericError::new(&e.to_string()))
 }
-
-fn create_buttons() -> Vec<CreateButton>{
-    let mut buttons: Vec<CreateButton> = Vec::new();
-
-    //create buttons 1-5
-    for i in 1..6 {
-        let mut button = CreateButton::default();
-        button.label(&i.to_string())
-            .style(ButtonStyle::Primary)
-            .custom_id(i);
-        buttons.push(button);
-    }
-
-    return buttons;
-}
-
-

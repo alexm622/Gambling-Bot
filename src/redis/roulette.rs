@@ -1,11 +1,15 @@
 use core::time;
 use redis::RedisError;
-use serenity::{model::prelude::{ChannelId, GuildId, Mention, UserId}, prelude::Context};
-use tracing::{info, error, warn};
+use serenity::{
+    model::prelude::{ChannelId, GuildId, Mention, UserId},
+    prelude::Context,
+};
+use tracing::{error, info, warn};
 
 use crate::{
     constants::ROULETTE_EXPIRE_TIME_SECONDS,
-    utils::roulette::{get_spin, SpinResult, bet_check}, sql::{select::get_all_bets, structs::BetResult, delete::drop_old_bets},
+    sql::{delete::drop_old_bets, select::get_all_bets, structs::BetResult},
+    utils::roulette::{bet_check, get_spin, SpinResult},
 };
 
 use super::{get_conn, users::apply_winnings};
@@ -39,7 +43,11 @@ pub async fn activate_table(id: ChannelId) -> Result<(), RedisError> {
 }
 
 //initiate table_spin
-pub async fn spin_table(guild_id: GuildId, id: ChannelId, ctx: Context) -> Result<Option<SpinResult>, RedisError> {
+pub async fn spin_table(
+    guild_id: GuildId,
+    id: ChannelId,
+    ctx: Context,
+) -> Result<Option<SpinResult>, RedisError> {
     if !match table_exists(id).await {
         Ok(e) => {
             info!("table active: {}", e);
@@ -69,15 +77,16 @@ pub async fn spin_table(guild_id: GuildId, id: ChannelId, ctx: Context) -> Resul
 }
 
 async fn spin_table_thread(guild_id: GuildId, id: ChannelId, ctx: Context) -> Result<(), String> {
-    info!("Spinning table for guild {} and channel {}", guild_id.0, id.0);
+    info!(
+        "Spinning table for guild {} and channel {}",
+        guild_id.0, id.0
+    );
     //sleep for ROULETTE_EXPIRE_TIME_SECONDS
     tokio::time::sleep(time::Duration::from_secs(ROULETTE_EXPIRE_TIME_SECONDS)).await;
     //get spin
     let spin_result = get_spin();
 
-    let bets = get_all_bets(id.0)
-        .await
-        .map_err(|e| e.to_string())?;
+    let bets = get_all_bets(id.0).await.map_err(|e| e.to_string())?;
 
     let mut winners = String::new();
     let mut new_vec: Vec<BetResult> = Vec::new();
@@ -97,32 +106,26 @@ async fn spin_table_thread(guild_id: GuildId, id: ChannelId, ctx: Context) -> Re
         )
     }
 
-    //create embed    
+    //create embed
     let mut embed = serenity::builder::CreateEmbed::default();
-    embed.title("Roulette Results")
+    embed
+        .title("Roulette Results")
         .description(format!(
             "The results are in! The spin was {}!{}",
-            spin_result,
-            winners
+            spin_result, winners
         ))
         .color(serenity::utils::Colour::from_rgb(255, 0, 0));
 
-    
     //apply the net to users and clear bet
 
-    drop_old_bets(id)
-        .await
-        .map_err(|e| e.to_string())?;
+    drop_old_bets(id).await.map_err(|e| e.to_string())?;
 
     //apply nets
     apply_winnings(new_vec, guild_id).await;
 
     //send message containing embed
 
-    match id
-        .send_message(&ctx.http, |m| m.set_embed(embed))
-        .await
-    {
+    match id.send_message(&ctx.http, |m| m.set_embed(embed)).await {
         Ok(_) => {}
         Err(e) => {
             warn!("Error sending message: {}", e);

@@ -10,7 +10,6 @@ use crate::errors::GenericError;
 pub mod roulette_bet;
 pub mod roulette_odds;
 
-
 pub async fn roulette_command_handler(
     command: ApplicationCommandInteraction,
     ctx: &Context,
@@ -21,7 +20,15 @@ pub async fn roulette_command_handler(
         // place a bet
         RouletteCommandsEnum::Roulette => {
             trace!("roulette called");
-            let embed = roulette_bet::get_bet_embed(&command.data.options, command.user.id, command.channel_id, command.guild_id.unwrap(), ctx).await.map_err(|e| {
+            let embed = roulette_bet::get_bet_embed(
+                &command.data.options,
+                command.user.id,
+                command.channel_id,
+                command.guild_id.unwrap(),
+                ctx,
+            )
+            .await
+            .map_err(|e| {
                 warn!("error getting bet embed: {}", e);
                 return GenericError::new(&format!("error getting bet embed: {}", e));
             })?;
@@ -36,7 +43,7 @@ pub async fn roulette_command_handler(
                     warn!("error sending response: {}", e);
                     return Err(GenericError::new(&format!("error sending response: {}", e)));
                 }
-            }         
+            }
         }
         RouletteCommandsEnum::RouletteOdds => {
             trace!("roulette odds called");

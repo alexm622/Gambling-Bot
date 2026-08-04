@@ -2,7 +2,6 @@ use serenity::model::prelude::interaction::application_command::{
     CommandDataOption, CommandDataOptionValue,
 };
 
-
 //run, return embed
 pub fn get_odds_embed(options: &[CommandDataOption]) -> serenity::builder::CreateEmbed {
     let option = options
@@ -19,7 +18,6 @@ pub fn get_odds_embed(options: &[CommandDataOption]) -> serenity::builder::Creat
     }
 }
 
-
 //run the command
 pub fn get_odds_string(options: &[CommandDataOption]) -> String {
     let option = options
@@ -35,7 +33,6 @@ pub fn get_odds_string(options: &[CommandDataOption]) -> String {
         return String::from("Expected option to be a string");
     }
 }
-
 
 //embeds
 fn get_odds_embed_string(option: &str) -> serenity::builder::CreateEmbed {

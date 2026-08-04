@@ -12,7 +12,12 @@ use crate::{
 use super::get_conn;
 
 //set the deck in redis
-pub async fn set_deck(gid: GuildId, cid: ChannelId, deck: Deck, game_id: u8) -> Result<(), RedisError> {
+pub async fn set_deck(
+    gid: GuildId,
+    cid: ChannelId,
+    deck: Deck,
+    game_id: u8,
+) -> Result<(), RedisError> {
     let deck_local = deck.clone();
     let deck_vec = deck_local.deck;
     clear_deck(gid, cid, game_id).await?;
@@ -26,11 +31,16 @@ pub async fn set_deck(gid: GuildId, cid: ChannelId, deck: Deck, game_id: u8) -> 
 }
 
 //push a single card to redis
-pub async fn push_card(gid: GuildId, cid: ChannelId, game_id: u8, card_id: u8) -> Result<(), RedisError> {
+pub async fn push_card(
+    gid: GuildId,
+    cid: ChannelId,
+    game_id: u8,
+    card_id: u8,
+) -> Result<(), RedisError> {
     let mut conn = get_conn().await?;
 
     let name = game_id_to_name(game_id);
-    let key_name = format!("deck_{}_{}_{}", name,gid.0, cid.0);
+    let key_name = format!("deck_{}_{}_{}", name, gid.0, cid.0);
 
     redis::cmd("LPUSH")
         .arg(key_name)
@@ -38,7 +48,12 @@ pub async fn push_card(gid: GuildId, cid: ChannelId, game_id: u8, card_id: u8) -
         .query::<()>(&mut conn)
 }
 
-pub async fn draw_card(gid:GuildId, cid: ChannelId, game_id: u8, size: u8) -> Result<(Card, Suite), RedisError> {
+pub async fn draw_card(
+    gid: GuildId,
+    cid: ChannelId,
+    game_id: u8,
+    size: u8,
+) -> Result<(Card, Suite), RedisError> {
     let mut conn = get_conn().await?;
     let name = game_id_to_name(game_id);
     let key_name = format!("deck_{}_{}_{}", name, gid.0, cid.0);
@@ -91,7 +106,7 @@ pub async fn clear_deck(gid: GuildId, cid: ChannelId, game_id: u8) -> Result<(),
     let mut conn = get_conn().await?;
 
     let name = game_id_to_name(game_id);
-    let key_name = format!("deck_{}_{}_{}", name,gid.0, cid.0);
+    let key_name = format!("deck_{}_{}_{}", name, gid.0, cid.0);
 
     match redis::cmd("del").arg(key_name).query::<()>(&mut conn) {
         Ok(_) => Ok(()),
@@ -104,7 +119,7 @@ pub async fn deck_exists(gid: GuildId, cid: ChannelId, game_id: u8) -> Result<bo
     let mut conn = get_conn().await?;
 
     let name = game_id_to_name(game_id);
-    let key_name = format!("deck_{}_{}_{}", name,gid.0, cid.0);
+    let key_name = format!("deck_{}_{}_{}", name, gid.0, cid.0);
 
     redis::cmd("exists").arg(key_name).query::<bool>(&mut conn)
 }

@@ -1,39 +1,51 @@
-use serenity::{model::prelude::interaction::application_command::ApplicationCommandInteraction, prelude::Context};
+use serenity::{
+    model::prelude::interaction::application_command::ApplicationCommandInteraction,
+    prelude::Context,
+};
 use tracing::info;
 
-use crate::{errors::GenericError, commands::{roulette::roulette_command_handler, money::money_command_handler, poker::poker_command_handler}};
+use crate::{
+    commands::{
+        money::money_command_handler, poker::poker_command_handler,
+        roulette::roulette_command_handler,
+    },
+    errors::GenericError,
+};
 
-pub async fn command_handler(command: ApplicationCommandInteraction, ctx: &Context) -> Result<(), GenericError>{
+pub async fn command_handler(
+    command: ApplicationCommandInteraction,
+    ctx: &Context,
+) -> Result<(), GenericError> {
     let name = command.data.name.clone();
     let category = command_to_category(&name);
 
-    match category{
+    match category {
         CategoriesEnum::Money => {
             //send to money command handler
             info!("money command called");
             money_command_handler(command, ctx).await?;
-        },
+        }
         CategoriesEnum::Roulette => {
             //send to roulette command handler
             info!("roulette command called");
             roulette_command_handler(command, ctx).await?;
-        },
+        }
         CategoriesEnum::Poker => {
             //send to poker command handler
             poker_command_handler(command, ctx).await?;
-        },
+        }
         CategoriesEnum::Slots => {
             //run the command
-        },
+        }
         CategoriesEnum::Blackjack => {
             //run the command
-        },
+        }
         CategoriesEnum::Mod => {
             //run the command
-        },
+        }
         CategoriesEnum::Help => {
             //run the command
-        },
+        }
         CategoriesEnum::InvalidCategory => {
             //run the command
         }
@@ -52,10 +64,10 @@ pub enum CategoriesEnum {
     Blackjack,
     Mod,
     Help,
-    InvalidCategory
+    InvalidCategory,
 }
 
-impl CategoriesEnum{
+impl CategoriesEnum {
     pub fn from_str(category: &str) -> CategoriesEnum {
         match category {
             "money" => CategoriesEnum::Money,
@@ -65,7 +77,7 @@ impl CategoriesEnum{
             "blackjack" => CategoriesEnum::Blackjack,
             "mod" => CategoriesEnum::Mod,
             "help" => CategoriesEnum::Help,
-            _ => CategoriesEnum::InvalidCategory
+            _ => CategoriesEnum::InvalidCategory,
         }
     }
 }
@@ -74,9 +86,10 @@ fn command_to_category(command: &str) -> CategoriesEnum {
     match command {
         "bal" | "reset_bal" | "reset_user_bal" => CategoriesEnum::Money,
         "roulette" | "roulette_odds" | "roulette_table" => CategoriesEnum::Roulette,
-        "poker"|"pdraw"| "phand" | "pdiscard" => CategoriesEnum::Poker,
+        "pstart" | "pjoin" | "pleave" | "pdraw" | "phand" | "pdiscard" | "pfold" | "pcheck"
+        | "pcall" | "praise" | "pallin" => CategoriesEnum::Poker,
         "slots" => CategoriesEnum::Slots,
         "blackjack" => CategoriesEnum::Blackjack,
-        _ => CategoriesEnum::InvalidCategory
+        _ => CategoriesEnum::InvalidCategory,
     }
 }

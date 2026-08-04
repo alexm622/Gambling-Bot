@@ -10,8 +10,9 @@ async-log = "2.0.0"
 mysql_async = "0.31.3"
 redis = { version = "0.23.0", features = ["tokio-comp"] }
 serde = "1.0.159"
+serde_json = "1.0.116"
 tokio = { version = "1.21.2", features = ["macros", "rt-multi-thread"] }
-tracing = "0.1.37"
+tracing = {version="0.1.37", features = ["release_max_level_info", "max_level_info"]}
 tracing-subscriber = { version = "0.3.16", features= ["env-filter"]}
 rand = "0.8.5"
 

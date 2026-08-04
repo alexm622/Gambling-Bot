@@ -1,15 +1,13 @@
 use std::process::exit;
 
-use serenity::async_trait; 
+use serenity::async_trait;
 
-
+use serenity::model::prelude::interaction::Interaction;
 use serenity::model::prelude::Ready;
-use serenity::model::prelude::interaction::{Interaction};
 use serenity::prelude::*;
 
 use sql::init_sql;
-use tracing::log::{error};
-use tracing::{info, Level};
+use tracing::{error, info, Level};
 use tracing_subscriber::{filter, fmt, prelude::*};
 
 pub mod commands;
@@ -19,7 +17,6 @@ pub mod redis;
 pub mod secrets;
 pub mod sql;
 pub mod utils;
-
 
 use utils::cleanup::cleanup;
 use utils::command_handler::command_handler;
@@ -33,15 +30,15 @@ impl EventHandler for Handler {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::ApplicationCommand(command) = interaction {
             //pass it to the command handler
-            match command_handler(command,&ctx).await{
+            match command_handler(command, &ctx).await {
                 Ok(_) => {}
                 Err(e) => {
                     error!("Error handling command: {}", e);
                 }
             };
-        }else if let Interaction::MessageComponent(component) = interaction{
+        } else if let Interaction::MessageComponent(component) = interaction {
             //pass it to the component handler
-            match component_handler(component, &ctx).await{
+            match component_handler(component, &ctx).await {
                 Ok(_) => {}
                 Err(e) => {
                     error!("Error handling component: {}", e);
@@ -110,7 +107,6 @@ async fn main() {
         }
     }
 
-
     // TODO refund all open tables
 
     //get the login token from file
@@ -125,5 +121,4 @@ async fn main() {
     if let Err(why) = client.start().await {
         error!("An error occurred while running the client: {:?}", why);
     }
-
 }

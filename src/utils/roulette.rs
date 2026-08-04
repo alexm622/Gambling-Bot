@@ -4,7 +4,7 @@ use core::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::sql::structs::{BetResult};
+use crate::sql::structs::BetResult;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone, Copy)]
 pub struct SpinResult {
@@ -13,9 +13,13 @@ pub struct SpinResult {
     pub oddness: bool,
 }
 
-impl fmt::Display for SpinResult{
+impl fmt::Display for SpinResult {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Value: {}, Color: {}, Oddness: {}", self.value, self.color, self.oddness)
+        write!(
+            f,
+            "Value: {}, Color: {}, Oddness: {}",
+            self.value, self.color, self.oddness
+        )
     }
 }
 
@@ -128,5 +132,4 @@ pub fn bet_check(bet: &mut BetResult, spin: SpinResult) {
             bet.net *= -1;
         }
     }
-
 }

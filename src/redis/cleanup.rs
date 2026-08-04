@@ -19,7 +19,7 @@ pub async fn remove_keys(keys: Vec<String>) -> Result<(), RedisError> {
     }
     let mut conn = get_conn().await?;
 
-    redis::cmd("DEL").arg(keys).query(&mut conn)?;
+    redis::cmd("DEL").arg(keys).query::<()>(&mut conn)?;
 
     Ok(())
 }

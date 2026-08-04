@@ -1,7 +1,7 @@
 //poker
 
 use redis::RedisError;
-use serenity::model::prelude::{ChannelId, UserId, GuildId};
+use serenity::model::prelude::{ChannelId, GuildId, UserId};
 use tracing::info;
 
 use crate::{
@@ -14,11 +14,15 @@ use crate::{
 
 use super::{get_conn, list_contains};
 
-pub async fn get_user_hand( gid: GuildId, cid: ChannelId, uid: UserId) -> Result<PokerHand, RedisError> {
+pub async fn get_user_hand(
+    gid: GuildId,
+    cid: ChannelId,
+    uid: UserId,
+) -> Result<PokerHand, RedisError> {
     let mut conn = get_conn().await?;
 
     info!("attemptng to get user {} hand", uid);
-    let key_name = format!("poker_{}_{}_{}",gid, cid, uid);
+    let key_name = format!("poker_{}_{}_{}", gid, cid, uid);
 
     //check if empty
     let len = redis::cmd("LLEN")
@@ -29,7 +33,7 @@ pub async fn get_user_hand( gid: GuildId, cid: ChannelId, uid: UserId) -> Result
     if len == 0 {
         info!("dealing new cards");
         let hand = get_new_poker_hand(gid, cid).await?;
-        push_poker_hand(hand,gid, cid, uid).await?;
+        push_poker_hand(hand, gid, cid, uid).await?;
         return Ok(hand);
     }
 
@@ -51,7 +55,6 @@ pub async fn get_user_hand( gid: GuildId, cid: ChannelId, uid: UserId) -> Result
         five: int_to_card(hand_primative.pop().unwrap()),
     };
 
-    
     Ok(hand)
 }
 
@@ -90,20 +93,26 @@ pub async fn push_poker_hand(
     }
 }
 
-pub async fn can_user_discard(uid: UserId, gid: GuildId, cid: ChannelId) -> Result<bool, RedisError> {
-    let key_name = format!("poker_candiscard_{}_{}",gid, cid);
+pub async fn can_user_discard(
+    uid: UserId,
+    gid: GuildId,
+    cid: ChannelId,
+) -> Result<bool, RedisError> {
+    let key_name = format!("poker_candiscard_{}_{}", gid, cid);
 
     Ok(list_contains(key_name, uid.to_string()).await?)
 }
 
-pub async fn activate_can_discard(gid: GuildId,cid: ChannelId) -> Result<(), RedisError> {
+pub async fn activate_can_discard(gid: GuildId, cid: ChannelId) -> Result<(), RedisError> {
     let mut conn = get_conn().await?;
 
-    let key_name = format!("poker_candiscard_{}_{}",gid, cid);
+    let key_name = format!("poker_candiscard_{}_{}", gid, cid);
 
-    redis::cmd("DEL").arg(key_name.clone()).query(&mut conn)?;
+    redis::cmd("DEL")
+        .arg(key_name.clone())
+        .query::<()>(&mut conn)?;
 
-    let uids = hand_keys_to_uid(get_open_hands(gid,cid).await?)?;
+    let uids = hand_keys_to_uid(get_open_hands(gid, cid).await?)?;
 
     let mut uid_str = String::new();
 
@@ -114,12 +123,12 @@ pub async fn activate_can_discard(gid: GuildId,cid: ChannelId) -> Result<(), Red
     redis::cmd("LPUSH")
         .arg(key_name)
         .arg(uid_str)
-        .query(&mut conn)?;
+        .query::<()>(&mut conn)?;
 
     Ok(())
 }
 
-pub async fn get_open_hands(gid:GuildId, cid: ChannelId) -> Result<Vec<String>, RedisError> {
+pub async fn get_open_hands(gid: GuildId, cid: ChannelId) -> Result<Vec<String>, RedisError> {
     let mut conn = get_conn().await?;
 
     let pattern = format!("poker_{}_{}_*", gid, cid);
@@ -144,15 +153,15 @@ pub fn hand_keys_to_uid(hand: Vec<String>) -> Result<Vec<UserId>, RedisError> {
 pub async fn set_can_join(gid: GuildId, cid: ChannelId) -> Result<(), RedisError> {
     let mut conn = get_conn().await?;
 
-    let key = format!("poker_joinable_{}_{}",gid, cid);
+    let key = format!("poker_joinable_{}_{}", gid, cid);
 
     Ok(redis::cmd("SET").arg(key).arg(1).query(&mut conn)?)
 }
 
-pub async fn join(gid: GuildId,cid: ChannelId, uid: UserId) -> Result<(), RedisError> {
+pub async fn join(gid: GuildId, cid: ChannelId, uid: UserId) -> Result<(), RedisError> {
     let mut conn = get_conn().await?;
 
-    let key = format!("poker_joinned_{}_{}",gid, cid);
+    let key = format!("poker_joinned_{}_{}", gid, cid);
 
     if list_contains(key.clone(), uid.to_string()).await? {
         return Ok(());
@@ -161,13 +170,13 @@ pub async fn join(gid: GuildId,cid: ChannelId, uid: UserId) -> Result<(), RedisE
     Ok(redis::cmd("LPUSH").arg(key).arg(uid.0).query(&mut conn)?)
 }
 
-pub async fn is_joinned(uid: UserId,gid: GuildId, cid: ChannelId) -> Result<bool, RedisError> {
-    let key = format!("poker_joinned_{}_{}", gid,cid);
+pub async fn is_joinned(uid: UserId, gid: GuildId, cid: ChannelId) -> Result<bool, RedisError> {
+    let key = format!("poker_joinned_{}_{}", gid, cid);
 
     Ok(list_contains(key.clone(), uid.to_string()).await?)
 }
 
-pub async fn can_player_join(gid: GuildId,cid: ChannelId) -> Result<bool, RedisError> {
+pub async fn can_player_join(gid: GuildId, cid: ChannelId) -> Result<bool, RedisError> {
     let mut conn = get_conn().await?;
 
     let key = format!("poker_joinable_{}_{}", gid, cid);
@@ -178,10 +187,204 @@ pub async fn can_player_join(gid: GuildId,cid: ChannelId) -> Result<bool, RedisE
         .query::<bool>(&mut conn)?)
 }
 
-pub async fn joinable_close(gid: GuildId,cid: ChannelId) -> Result<(), RedisError> {
+pub async fn joinable_close(gid: GuildId, cid: ChannelId) -> Result<(), RedisError> {
     let mut conn = get_conn().await?;
 
-    let key = format!("poker_joinable_{}_{}",gid, cid);
+    let key = format!("poker_joinable_{}_{}", gid, cid);
 
     Ok(redis::cmd("DEL").arg(key).query(&mut conn)?)
+}
+
+pub async fn remove_user_from_joined(
+    gid: GuildId,
+    cid: ChannelId,
+    uid: UserId,
+) -> Result<(), RedisError> {
+    let mut conn = get_conn().await?;
+    let key = format!("poker_joinned_{}_{}", gid, cid);
+    redis::cmd("LREM")
+        .arg(key)
+        .arg(0)
+        .arg(uid.0)
+        .query::<()>(&mut conn)?;
+    Ok(())
+}
+
+pub async fn remove_user_hand(gid: GuildId, cid: ChannelId, uid: UserId) -> Result<(), RedisError> {
+    let mut conn = get_conn().await?;
+    let key = format!("poker_{}_{}_{}", gid, cid, uid);
+    redis::cmd("DEL").arg(key).query::<()>(&mut conn)?;
+    Ok(())
+}
+
+pub async fn start_game(gid: GuildId, cid: ChannelId, uid: UserId) -> Result<(), RedisError> {
+    let mut conn = get_conn().await?;
+
+    set_can_join(gid, cid).await?;
+
+    let joined_key = format!("poker_joinned_{}_{}", gid, cid);
+    redis::cmd("DEL")
+        .arg(joined_key.clone())
+        .query::<()>(&mut conn)?;
+    redis::cmd("LPUSH")
+        .arg(joined_key)
+        .arg(uid.0)
+        .query::<()>(&mut conn)?;
+
+    // deal the host a hand so the deck is created
+    let _hand = get_user_hand(gid, cid, uid).await?;
+
+    let bet_key = format!("poker_current_bet_{}_{}", gid, cid);
+    let pot_key = format!("poker_pot_{}_{}", gid, cid);
+    let folded_key = format!("poker_folded_{}_{}", gid, cid);
+    redis::cmd("SET")
+        .arg(bet_key)
+        .arg(0u64)
+        .query::<()>(&mut conn)?;
+    redis::cmd("SET")
+        .arg(pot_key)
+        .arg(0u64)
+        .query::<()>(&mut conn)?;
+    redis::cmd("DEL").arg(folded_key).query::<()>(&mut conn)?;
+
+    Ok(())
+}
+
+pub async fn get_joined_players(gid: GuildId, cid: ChannelId) -> Result<Vec<UserId>, RedisError> {
+    let mut conn = get_conn().await?;
+    let key = format!("poker_joinned_{}_{}", gid, cid);
+    let len = redis::cmd("LLEN").arg(key.clone()).query::<u8>(&mut conn)?;
+    let list = redis::cmd("LRANGE")
+        .arg(key)
+        .arg(0)
+        .arg(len)
+        .query::<Vec<String>>(&mut conn)?;
+    let mut uids = Vec::new();
+    for s in list {
+        if let Ok(id) = s.parse::<u64>() {
+            uids.push(UserId::from(id));
+        }
+    }
+    Ok(uids)
+}
+
+pub async fn fold_user(gid: GuildId, cid: ChannelId, uid: UserId) -> Result<(), RedisError> {
+    let mut conn = get_conn().await?;
+    let key = format!("poker_folded_{}_{}", gid, cid);
+    if !list_contains(key.clone(), uid.to_string()).await? {
+        redis::cmd("LPUSH")
+            .arg(key)
+            .arg(uid.0)
+            .query::<()>(&mut conn)?;
+    }
+    Ok(())
+}
+
+pub async fn is_folded(gid: GuildId, cid: ChannelId, uid: UserId) -> Result<bool, RedisError> {
+    let key = format!("poker_folded_{}_{}", gid, cid);
+    Ok(list_contains(key, uid.to_string()).await?)
+}
+
+pub async fn get_current_bet(gid: GuildId, cid: ChannelId) -> Result<u64, RedisError> {
+    let mut conn = get_conn().await?;
+    let key = format!("poker_current_bet_{}_{}", gid, cid);
+    match redis::cmd("GET").arg(key).query::<u64>(&mut conn) {
+        Ok(v) => Ok(v),
+        Err(_) => Ok(0),
+    }
+}
+
+pub async fn set_current_bet(gid: GuildId, cid: ChannelId, amount: u64) -> Result<(), RedisError> {
+    let mut conn = get_conn().await?;
+    let key = format!("poker_current_bet_{}_{}", gid, cid);
+    redis::cmd("SET")
+        .arg(key)
+        .arg(amount)
+        .query::<()>(&mut conn)?;
+    Ok(())
+}
+
+pub async fn get_pot(gid: GuildId, cid: ChannelId) -> Result<u64, RedisError> {
+    let mut conn = get_conn().await?;
+    let key = format!("poker_pot_{}_{}", gid, cid);
+    match redis::cmd("GET").arg(key).query::<u64>(&mut conn) {
+        Ok(v) => Ok(v),
+        Err(_) => Ok(0),
+    }
+}
+
+pub async fn add_to_pot(gid: GuildId, cid: ChannelId, amount: u64) -> Result<(), RedisError> {
+    let mut conn = get_conn().await?;
+    let key = format!("poker_pot_{}_{}", gid, cid);
+    redis::cmd("INCRBY")
+        .arg(key)
+        .arg(amount)
+        .query::<()>(&mut conn)?;
+    Ok(())
+}
+
+pub async fn get_user_bet(gid: GuildId, cid: ChannelId, uid: UserId) -> Result<u64, RedisError> {
+    let mut conn = get_conn().await?;
+    let key = format!("poker_user_bet_{}_{}_{}", gid, cid, uid);
+    match redis::cmd("GET").arg(key).query::<u64>(&mut conn) {
+        Ok(v) => Ok(v),
+        Err(_) => Ok(0),
+    }
+}
+
+pub async fn set_user_bet(
+    gid: GuildId,
+    cid: ChannelId,
+    uid: UserId,
+    amount: u64,
+) -> Result<(), RedisError> {
+    let mut conn = get_conn().await?;
+    let key = format!("poker_user_bet_{}_{}_{}", gid, cid, uid);
+    redis::cmd("SET")
+        .arg(key)
+        .arg(amount)
+        .query::<()>(&mut conn)?;
+    Ok(())
+}
+
+pub async fn clear_user_bet(gid: GuildId, cid: ChannelId, uid: UserId) -> Result<(), RedisError> {
+    let mut conn = get_conn().await?;
+    let key = format!("poker_user_bet_{}_{}_{}", gid, cid, uid);
+    redis::cmd("DEL").arg(key).query::<()>(&mut conn)?;
+    Ok(())
+}
+
+pub async fn cleanup_game(gid: GuildId, cid: ChannelId) -> Result<(), RedisError> {
+    let mut conn = get_conn().await?;
+    let patterns = vec![
+        format!("poker_{}_{}_*", gid, cid),
+        format!("poker_joinned_{}_{}", gid, cid),
+        format!("poker_joinable_{}_{}", gid, cid),
+        format!("poker_current_bet_{}_{}", gid, cid),
+        format!("poker_pot_{}_{}", gid, cid),
+        format!("poker_folded_{}_{}", gid, cid),
+        format!("poker_candiscard_{}_{}", gid, cid),
+        format!("poker_state_{}_{}", gid, cid),
+        format!("deck_poker_{}_{}", gid, cid),
+    ];
+
+    for pattern in patterns {
+        let keys: Vec<String> = redis::cmd("KEYS")
+            .arg(pattern)
+            .query(&mut conn)
+            .unwrap_or_default();
+        for key in keys {
+            let _: Result<(), _> = redis::cmd("DEL").arg(key).query(&mut conn);
+        }
+    }
+
+    let user_bet_keys: Vec<String> = redis::cmd("KEYS")
+        .arg(format!("poker_user_bet_{}_{}_*", gid, cid))
+        .query(&mut conn)
+        .unwrap_or_default();
+    for key in user_bet_keys {
+        let _: Result<(), _> = redis::cmd("DEL").arg(key).query(&mut conn);
+    }
+
+    Ok(())
 }
