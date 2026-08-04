@@ -8,12 +8,14 @@ use tracing::{info, warn};
 
 use crate::{
     commands::poker::{
-        session::{self, Phase, PokerGameState},
+        bot,
+        hand_evaluator::{self},
+        session::{self, is_bot, Phase, PokerGameState},
         ui,
     },
     errors::GenericError,
-    redis::{poker as poker_redis, users},
-    sql::structs::{poker_hand_to_emojis, PokerHand},
+    redis::{decks::draw_card, users},
+    utils::deck::card_to_int,
 };
 
 pub const LOBBY_SECONDS: u64 = 60;
@@ -86,13 +88,6 @@ pub async fn handle_join(
         .await
         .map_err(|e| GenericError::new(&e.to_string()))?;
 
-    poker_redis::get_user_hand(gid, cid, uid)
-        .await
-        .map_err(|e| GenericError::new(&e.to_string()))?;
-    poker_redis::clear_user_bet(gid, cid, uid)
-        .await
-        .map_err(|e| GenericError::new(&e.to_string()))?;
-
     update_lobby_message(ctx, gid, cid, &state).await?;
     Ok(())
 }
@@ -116,19 +111,25 @@ async fn auto_start_game(ctx: &Context, gid: GuildId, cid: ChannelId) -> Result<
         return Ok(());
     }
 
-    if state.players.len() < 2 {
-        cid.send_message(&ctx.http, |m| {
-            m.content("Not enough players to start poker.")
-        })
-        .await
-        .map_err(|e| GenericError::new(&e.to_string()))?;
+    if state.players.is_empty() {
+        cid.send_message(&ctx.http, |m| m.content("No players in the lobby."))
+            .await
+            .map_err(|e| GenericError::new(&e.to_string()))?;
         session::delete_state(gid, cid)
             .await
             .map_err(|e| GenericError::new(&e.to_string()))?;
         return Ok(());
     }
 
-    // disable lobby buttons
+    if state.players.len() == 1 {
+        state.add_bot();
+        cid.send_message(&ctx.http, |m| {
+            m.content("Only one player joined. A bot opponent has been added to the table.")
+        })
+        .await
+        .map_err(|e| GenericError::new(&e.to_string()))?;
+    }
+
     if let Some(lobby_mid) = state.lobby_message_id {
         if let Ok(mut lobby_msg) = cid.message(&ctx.http, MessageId(lobby_mid)).await {
             let _ = lobby_msg
@@ -145,11 +146,52 @@ async fn auto_start_game(ctx: &Context, gid: GuildId, cid: ChannelId) -> Result<
         .await
         .map_err(|e| GenericError::new(&e.to_string()))?;
 
+    // deal hole cards
     for uid in state.players.clone() {
-        let _ = poker_redis::get_user_hand(gid, cid, UserId::from(uid))
+        let c1 = draw_card(gid, cid, 0, 52).await.map_err(|e| GenericError::new(&e.to_string()))?;
+        let c2 = draw_card(gid, cid, 0, 52).await.map_err(|e| GenericError::new(&e.to_string()))?;
+        state.set_hole_cards(UserId::from(uid), vec![card_to_int(c1), card_to_int(c2)]);
+    }
+
+    // post blinds
+    let len = state.players.len();
+    // in heads-up the dealer is the small blind; otherwise dealer is the button
+    let (sb_pos, bb_pos) = if len == 2 {
+        (state.dealer_index, (state.dealer_index + 1) % len)
+    } else {
+        (
+            (state.dealer_index + 1) % len,
+            (state.dealer_index + 2) % len,
+        )
+    };
+    let sb_uid = UserId::from(state.players[sb_pos]);
+    let bb_uid = UserId::from(state.players[bb_pos]);
+
+    if is_bot(sb_uid) {
+        state.bot_balance = state.bot_balance.saturating_sub(state.small_blind);
+    } else {
+        users::user_add(sb_uid, gid, -(state.small_blind as i64))
             .await
             .map_err(|e| GenericError::new(&e.to_string()))?;
     }
+    state.place_bet(sb_uid, state.small_blind);
+
+    if is_bot(bb_uid) {
+        state.bot_balance = state.bot_balance.saturating_sub(state.big_blind);
+    } else {
+        users::user_add(bb_uid, gid, -(state.big_blind as i64))
+            .await
+            .map_err(|e| GenericError::new(&e.to_string()))?;
+    }
+    state.place_bet(bb_uid, state.big_blind);
+    state.current_bet = state.big_blind;
+
+    // action starts after big blind
+    state.current_player_index = (bb_pos + 1) % len;
+
+    session::save_state(gid, cid, &state)
+        .await
+        .map_err(|e| GenericError::new(&e.to_string()))?;
 
     let embed = ui::create_status_embed(&state);
     let message = cid
@@ -177,33 +219,75 @@ async fn start_turn(ctx: &Context, gid: GuildId, cid: ChannelId) -> Result<(), G
         state.skip_folded_players();
 
         if state.active_players().len() < 2 || state.betting_round_complete() {
-            let phase = advance_phase_flow(ctx, gid, cid, &mut state).await?;
-            match phase {
-                Phase::Showdown | Phase::Finished => return Ok(()),
-                Phase::Draw => {
-                    cid.send_message(&ctx.http, |m| {
-                        m.content("Draw phase! Use `/pdiscard` to replace cards (e.g. `1 3 5`) or `/phand` to view your hand.")
-                    })
-                    .await
-                    .map_err(|e| GenericError::new(&e.to_string()))?;
-                    schedule_draw_timer(ctx.clone(), gid, cid);
-                    return Ok(());
-                }
-                Phase::SecondBet => {
-                    continue;
-                }
-                _ => return Ok(()),
+            let previous_phase = state.phase.clone();
+            state.advance_phase();
+            let new_phase = state.phase.clone();
+
+            // deal community cards
+            if previous_phase == Phase::PreFlop && new_phase == Phase::Flop {
+                let c1 = draw_card(gid, cid, 0, 52).await.map_err(|e| GenericError::new(&e.to_string()))?;
+                let c2 = draw_card(gid, cid, 0, 52).await.map_err(|e| GenericError::new(&e.to_string()))?;
+                let c3 = draw_card(gid, cid, 0, 52).await.map_err(|e| GenericError::new(&e.to_string()))?;
+                state.add_community_card(card_to_int(c1));
+                state.add_community_card(card_to_int(c2));
+                state.add_community_card(card_to_int(c3));
+            } else if previous_phase == Phase::Flop && new_phase == Phase::Turn {
+                let c = draw_card(gid, cid, 0, 52).await.map_err(|e| GenericError::new(&e.to_string()))?;
+                state.add_community_card(card_to_int(c));
+            } else if previous_phase == Phase::Turn && new_phase == Phase::River {
+                let c = draw_card(gid, cid, 0, 52).await.map_err(|e| GenericError::new(&e.to_string()))?;
+                state.add_community_card(card_to_int(c));
             }
+
+            // reset betting for new round
+            state.current_bet = 0;
+            state.round_bets.clear();
+            state.acted_this_round.clear();
+            state.current_player_index = (state.dealer_index + 1) % state.players.len();
+
+            session::save_state(gid, cid, &state)
+                .await
+                .map_err(|e| GenericError::new(&e.to_string()))?;
+
+            update_status_message(ctx, gid, cid, &state).await?;
+
+            if new_phase == Phase::Showdown {
+                run_showdown(ctx, gid, cid).await?;
+                return Ok(());
+            }
+
+            cid.send_message(&ctx.http, |m| {
+                m.embed(|e| {
+                    let phase_name = match new_phase {
+                        Phase::Flop => "Flop",
+                        Phase::Turn => "Turn",
+                        Phase::River => "River",
+                        _ => "",
+                    };
+                    e.title(format!("{} Dealt", phase_name))
+                        .description(ui::format_community_cards(&state))
+                })
+            })
+            .await
+            .map_err(|e| GenericError::new(&e.to_string()))?;
+
+            continue;
         }
 
+        state.turn_timer_id += 1;
+        let timer_id = state.turn_timer_id;
         session::save_state(gid, cid, &state)
             .await
             .map_err(|e| GenericError::new(&e.to_string()))?;
         update_status_message(ctx, gid, cid, &state).await?;
 
         if let Some(uid) = state.current_player() {
-            send_action_prompt(ctx, gid, cid, uid).await?;
-            start_turn_timer(ctx.clone(), gid, cid, uid, state.turn_seconds);
+            if bot::is_bot(uid) {
+                bot::start_bot_turn_timer(ctx.clone(), gid, cid, timer_id);
+            } else {
+                send_action_prompt(ctx, gid, cid, uid).await?;
+                start_turn_timer(ctx.clone(), gid, cid, uid, state.turn_seconds, timer_id);
+            }
         }
         return Ok(());
     }
@@ -215,15 +299,12 @@ async fn send_action_prompt(
     cid: ChannelId,
     uid: UserId,
 ) -> Result<(), GenericError> {
-    let mut embed = serenity::builder::CreateEmbed::default();
-    embed
-        .title(format!("<@{}>'s Turn", uid.0))
-        .description(format!(
-            "It's <@{}>'s turn! They have {} seconds to act.",
-            uid.0, TURN_SECONDS
-        ))
-        .color(serenity::utils::Colour::GOLD);
+    let state = session::load_state(gid, cid)
+        .await
+        .map_err(|e| GenericError::new(&e.to_string()))?
+        .ok_or(GenericError::new(&"No poker game found."))?;
 
+    let embed = ui::create_action_prompt_embed(&state, uid);
     let buttons = ui::create_action_buttons(gid, cid, uid);
 
     cid.send_message(&ctx.http, |m| {
@@ -240,10 +321,10 @@ async fn send_action_prompt(
     Ok(())
 }
 
-fn start_turn_timer(ctx: Context, gid: GuildId, cid: ChannelId, uid: UserId, seconds: u64) {
+fn start_turn_timer(ctx: Context, gid: GuildId, cid: ChannelId, uid: UserId, seconds: u64, timer_id: u64) {
     tokio::spawn(async move {
         tokio::time::sleep(Duration::from_secs(seconds)).await;
-        if let Err(e) = handle_auto_fold(&ctx, gid, cid, uid).await {
+        if let Err(e) = handle_auto_fold(&ctx, gid, cid, uid, timer_id).await {
             warn!("auto fold failed: {}", e);
         }
     });
@@ -254,11 +335,16 @@ async fn handle_auto_fold(
     gid: GuildId,
     cid: ChannelId,
     uid: UserId,
+    timer_id: u64,
 ) -> Result<(), GenericError> {
     let state = session::load_state(gid, cid)
         .await
         .map_err(|e| GenericError::new(&e.to_string()))?
         .ok_or(GenericError::new(&"No poker game found."))?;
+
+    if state.turn_timer_id != timer_id {
+        return Ok(());
+    }
 
     if let Some(current) = state.current_player() {
         if current != uid {
@@ -269,6 +355,12 @@ async fn handle_auto_fold(
     }
 
     info!("auto folding {} in {} {}", uid, gid, cid);
+
+    let embed = ui::create_timeout_embed(uid);
+    cid.send_message(&ctx.http, |m| m.set_embed(embed))
+        .await
+        .map_err(|e| GenericError::new(&e.to_string()))?;
+
     apply_fold(ctx, gid, cid, uid).await?;
     Ok(())
 }
@@ -322,18 +414,15 @@ async fn apply_fold(
 
     state.fold(uid);
     state.mark_acted(uid);
+    state.advance_turn();
     session::save_state(gid, cid, &state)
         .await
         .map_err(|e| GenericError::new(&e.to_string()))?;
 
-    cid.send_message(&ctx.http, |m| {
-        m.embed(|e| {
-            e.title("Player Folded")
-                .description(format!("<@{}> folded.", uid.0))
-        })
-    })
-    .await
-    .map_err(|e| GenericError::new(&e.to_string()))?;
+    let embed = ui::create_action_result_embed(&state, uid, "folded.");
+    cid.send_message(&ctx.http, |m| m.set_embed(embed))
+        .await
+        .map_err(|e| GenericError::new(&e.to_string()))?;
 
     update_status_message(ctx, gid, cid, &state).await?;
     start_turn(ctx, gid, cid).await?;
@@ -355,35 +444,42 @@ async fn apply_check_call(
     let user_bet = state.player_bet(uid);
     let to_call = current_bet.saturating_sub(user_bet);
 
-    let bal = users::get_user_bal(uid, gid)
-        .await
-        .map_err(|e| GenericError::new(&e.to_string()))?;
+    if bot::is_bot(uid) {
+        if state.bot_balance < to_call {
+            return Err(GenericError::new(&"Bot does not have enough chips to call."));
+        }
+        state.bot_balance -= to_call;
+    } else {
+        let bal = users::get_user_bal(uid, gid)
+            .await
+            .map_err(|e| GenericError::new(&e.to_string()))?;
 
-    if (bal as u64) < to_call {
-        return Err(GenericError::new(&"Not enough chips to call."));
+        if (bal as u64) < to_call {
+            return Err(GenericError::new(&"Not enough chips to call."));
+        }
+
+        users::user_add(uid, gid, -(to_call as i64))
+            .await
+            .map_err(|e| GenericError::new(&e.to_string()))?;
     }
 
-    users::user_add(uid, gid, -(to_call as i64))
-        .await
-        .map_err(|e| GenericError::new(&e.to_string()))?;
     state.place_bet(uid, to_call);
     state.mark_acted(uid);
+    state.advance_turn();
 
     session::save_state(gid, cid, &state)
         .await
         .map_err(|e| GenericError::new(&e.to_string()))?;
 
-    cid.send_message(&ctx.http, |m| {
-        m.embed(|e| {
-            e.title("Player Action").description(format!(
-                "<@{}> {}.",
-                uid.0,
-                if to_call == 0 { "checked" } else { "called" }
-            ))
-        })
-    })
-    .await
-    .map_err(|e| GenericError::new(&e.to_string()))?;
+    let action_text = if to_call == 0 {
+        "checked.".to_string()
+    } else {
+        format!("called the {} chip bet.", current_bet)
+    };
+    let embed = ui::create_action_result_embed(&state, uid, &action_text);
+    cid.send_message(&ctx.http, |m| m.set_embed(embed))
+        .await
+        .map_err(|e| GenericError::new(&e.to_string()))?;
 
     update_status_message(ctx, gid, cid, &state).await?;
     start_turn(ctx, gid, cid).await?;
@@ -407,36 +503,44 @@ async fn apply_raise(
     let new_bet = current_bet + raise_amount;
     let to_pay = new_bet.saturating_sub(user_bet);
 
-    let bal = users::get_user_bal(uid, gid)
-        .await
-        .map_err(|e| GenericError::new(&e.to_string()))?;
-
-    if (bal as u64) < to_pay || to_pay == 0 {
-        return Err(GenericError::new(&"Not enough chips to raise."));
+    if to_pay == 0 {
+        return Err(GenericError::new(&"Raise amount is too small."));
     }
 
-    users::user_add(uid, gid, -(to_pay as i64))
-        .await
-        .map_err(|e| GenericError::new(&e.to_string()))?;
+    if bot::is_bot(uid) {
+        if state.bot_balance < to_pay {
+            return Err(GenericError::new(&"Bot does not have enough chips to raise."));
+        }
+        state.bot_balance -= to_pay;
+    } else {
+        let bal = users::get_user_bal(uid, gid)
+            .await
+            .map_err(|e| GenericError::new(&e.to_string()))?;
+
+        if (bal as u64) < to_pay {
+            return Err(GenericError::new(&"Not enough chips to raise."));
+        }
+
+        users::user_add(uid, gid, -(to_pay as i64))
+            .await
+            .map_err(|e| GenericError::new(&e.to_string()))?;
+    }
+
     state.place_bet(uid, to_pay);
     state.current_bet = new_bet;
     state.clear_acted_except(uid);
     state.mark_acted(uid);
+    state.advance_turn();
 
     session::save_state(gid, cid, &state)
         .await
         .map_err(|e| GenericError::new(&e.to_string()))?;
 
-    cid.send_message(&ctx.http, |m| {
-        m.embed(|e| {
-            e.title("Player Action").description(format!(
-                "<@{}> raised by {}. Current bet is now {}.",
-                uid.0, raise_amount, new_bet
-            ))
-        })
-    })
-    .await
-    .map_err(|e| GenericError::new(&e.to_string()))?;
+    let action_text = format!("raised by {}. Current bet is now {}.", raise_amount, new_bet);
+    let embed = ui::create_action_result_embed(&state, uid, &action_text);
+    cid.send_message(&ctx.http, |m| m.set_embed(embed))
+        .await
+        .map_err(|e| GenericError::new(&e.to_string()))?;
 
     update_status_message(ctx, gid, cid, &state).await?;
     start_turn(ctx, gid, cid).await?;
@@ -454,142 +558,184 @@ async fn apply_all_in(
         .map_err(|e| GenericError::new(&e.to_string()))?
         .ok_or(GenericError::new(&"No poker game found."))?;
 
-    let bal = users::get_user_bal(uid, gid)
-        .await
-        .map_err(|e| GenericError::new(&e.to_string()))?;
+    let (amount, to_pay) = if bot::is_bot(uid) {
+        let current_bet = state.current_bet;
+        let user_bet = state.player_bet(uid);
+        let to_call = current_bet.saturating_sub(user_bet);
+        let amount = state.bot_balance.saturating_sub(to_call);
+        let to_pay = to_call + amount;
+        (amount, to_pay)
+    } else {
+        let bal = users::get_user_bal(uid, gid)
+            .await
+            .map_err(|e| GenericError::new(&e.to_string()))?;
 
-    if bal <= 0 {
-        return Err(GenericError::new(&"No chips to go all in."));
+        if bal <= 0 {
+            return Err(GenericError::new(&"No chips to go all in."));
+        }
+
+        let amount = bal as u64;
+        let current_bet = state.current_bet;
+        let user_bet = state.player_bet(uid);
+        let to_pay = amount + current_bet.saturating_sub(user_bet);
+
+        let actual_bal = users::get_user_bal(uid, gid)
+            .await
+            .map_err(|e| GenericError::new(&e.to_string()))?;
+        if (actual_bal as u64) < to_pay {
+            return Err(GenericError::new(&"Not enough chips to go all in."));
+        }
+
+        users::user_add(uid, gid, -bal)
+            .await
+            .map_err(|e| GenericError::new(&e.to_string()))?;
+
+        (amount, to_pay)
+    };
+
+    if bot::is_bot(uid) {
+        if state.bot_balance < to_pay {
+            return Err(GenericError::new(&"Bot does not have enough chips to go all in."));
+        }
+        state.bot_balance -= to_pay;
     }
 
-    let amount = bal as u64;
-    let current_bet = state.current_bet;
-    let user_bet = state.player_bet(uid);
-    let new_bet = current_bet + amount;
-    let to_pay = amount + current_bet.saturating_sub(user_bet);
-
-    let actual_bal = users::get_user_bal(uid, gid)
-        .await
-        .map_err(|e| GenericError::new(&e.to_string()))?;
-    if (actual_bal as u64) < to_pay {
-        return Err(GenericError::new(&"Not enough chips to go all in."));
-    }
-
-    users::user_add(uid, gid, -(to_pay as i64))
-        .await
-        .map_err(|e| GenericError::new(&e.to_string()))?;
+    let new_bet = state.current_bet + amount;
     state.place_bet(uid, to_pay);
     state.current_bet = new_bet;
     state.clear_acted_except(uid);
     state.mark_acted(uid);
+    state.advance_turn();
 
     session::save_state(gid, cid, &state)
         .await
         .map_err(|e| GenericError::new(&e.to_string()))?;
 
-    cid.send_message(&ctx.http, |m| {
-        m.embed(|e| {
-            e.title("Player Action")
-                .description(format!("<@{}> went all in with {} chips!", uid.0, to_pay))
-        })
-    })
-    .await
-    .map_err(|e| GenericError::new(&e.to_string()))?;
+    let action_text = format!("went all in with {} chips!", to_pay);
+    let embed = ui::create_action_result_embed(&state, uid, &action_text);
+    cid.send_message(&ctx.http, |m| m.set_embed(embed))
+        .await
+        .map_err(|e| GenericError::new(&e.to_string()))?;
 
     update_status_message(ctx, gid, cid, &state).await?;
     start_turn(ctx, gid, cid).await?;
     Ok(())
 }
 
-async fn advance_phase_flow(
-    ctx: &Context,
-    gid: GuildId,
-    cid: ChannelId,
-    state: &mut PokerGameState,
-) -> Result<Phase, GenericError> {
-    if state.active_players().len() < 2 {
-        state.phase = Phase::Showdown;
-    } else {
-        state.advance_phase();
-    }
-
-    session::save_state(gid, cid, state)
-        .await
-        .map_err(|e| GenericError::new(&e.to_string()))?;
-
-    update_status_message(ctx, gid, cid, state).await?;
-
-    if state.phase == Phase::Showdown {
-        run_showdown(ctx, gid, cid).await?;
-    }
-
-    Ok(state.phase.clone())
-}
-
-pub async fn advance_from_draw(
-    ctx: &Context,
-    gid: GuildId,
-    cid: ChannelId,
-) -> Result<(), GenericError> {
+async fn run_showdown(ctx: &Context, gid: GuildId, cid: ChannelId) -> Result<(), GenericError> {
     let mut state = session::load_state(gid, cid)
         .await
         .map_err(|e| GenericError::new(&e.to_string()))?
         .ok_or(GenericError::new(&"No poker game found."))?;
 
-    if state.phase != Phase::Draw {
-        return Ok(());
-    }
-
-    advance_phase_flow(ctx, gid, cid, &mut state).await?;
-    start_turn(ctx, gid, cid).await?;
-    Ok(())
-}
-
-fn schedule_draw_timer(ctx: Context, gid: GuildId, cid: ChannelId) {
-    tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_secs(60)).await;
-        if let Err(e) = advance_from_draw(&ctx, gid, cid).await {
-            warn!("advance from draw failed: {}", e);
-        }
-    });
-}
-
-async fn run_showdown(ctx: &Context, gid: GuildId, cid: ChannelId) -> Result<(), GenericError> {
-    let state = session::load_state(gid, cid)
-        .await
-        .map_err(|e| GenericError::new(&e.to_string()))?
-        .ok_or(GenericError::new(&"No poker game found."))?;
-
-    let active = state.active_players();
+    let active: Vec<UserId> = state.active_players();
     if active.is_empty() {
         return Ok(());
     }
 
-    let mut hands: Vec<(UserId, PokerHand)> = Vec::new();
-    for uid in active.clone() {
-        if let Ok(hand) = poker_redis::get_user_hand(gid, cid, uid).await {
-            hands.push((uid, hand));
+    if active.len() == 1 {
+        // everyone else folded
+        let winner = active[0];
+        let pot = state.pot;
+        if is_bot(winner) {
+            state.bot_balance += pot;
+        } else {
+            users::user_add(winner, gid, pot as i64)
+                .await
+                .map_err(|e| GenericError::new(&e.to_string()))?;
         }
-    }
 
-    let winner = hands.first().map(|(u, _)| *u).unwrap_or(active[0]);
-    let pot = state.pot;
-
-    users::user_add(winner, gid, pot as i64)
+        cid.send_message(&ctx.http, |m| {
+            m.embed(|e| {
+                e.title("Showdown")
+                    .description(format!("{} wins the pot of {} chips!", ui::player_name(winner), pot))
+            })
+        })
         .await
         .map_err(|e| GenericError::new(&e.to_string()))?;
 
-    let hand_desc = hands
+        session::delete_state(gid, cid)
+            .await
+            .map_err(|e| GenericError::new(&e.to_string()))?;
+        return Ok(());
+    }
+
+    // evaluate hands
+    let mut ranked: Vec<(UserId, Vec<u8>)> = active
         .iter()
-        .map(|(u, h)| format!("<@{}>: {}", u.0, poker_hand_to_emojis(*h)))
+        .map(|&uid| {
+            let cards = state.all_cards_for_player(uid);
+            let rank = hand_evaluator::evaluate_seven(&cards);
+            (uid, rank)
+        })
+        .collect();
+
+    ranked.sort_by(|a, b| b.1.cmp(&a.1));
+
+    let best_rank = ranked[0].1.clone();
+    let winners: Vec<UserId> = ranked
+        .iter()
+        .take_while(|(_, r)| *r == best_rank)
+        .map(|(u, _)| *u)
+        .collect();
+
+    let pot = state.pot;
+    let share = pot / winners.len() as u64;
+    let remainder = pot % winners.len() as u64;
+
+    for (i, &winner) in winners.iter().enumerate() {
+        let amount = share + if i < remainder as usize { 1 } else { 0 };
+        if is_bot(winner) {
+            state.bot_balance += amount;
+        } else {
+            users::user_add(winner, gid, amount as i64)
+                .await
+                .map_err(|e| GenericError::new(&e.to_string()))?;
+        }
+    }
+
+    // reveal all active hands
+    let hand_desc = active
+        .iter()
+        .map(|&u| {
+            let hole = state.hole_cards_eval(u);
+            let hole_str = hole
+                .iter()
+                .map(|c| hand_evaluator::card_to_emoji(*c))
+                .collect::<Vec<_>>()
+                .join(" ");
+            let rank = hand_evaluator::evaluate_seven(&state.all_cards_for_player(u));
+            format!(
+                "{}: {} ({})",
+                ui::player_name(u),
+                hole_str,
+                hand_evaluator::rank_to_string(&rank)
+            )
+        })
         .collect::<Vec<_>>()
         .join("\n");
 
-    let embed = ui::create_showdown_embed(&[(winner, "hand".to_string())], pot);
+    let winners_str = winners
+        .iter()
+        .map(|&u| ui::player_name(u))
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    let embed = ui::create_showdown_embed(
+        &winners
+            .iter()
+            .map(|&u| (u, hand_evaluator::rank_to_string(&best_rank)))
+            .collect::<Vec<_>>(),
+        pot,
+    );
+
     cid.send_message(&ctx.http, |m| {
         m.set_embed(embed).content(format!(
-            "Showdown!\n{}\n\n<@{}> wins the pot of {} chips!",
-            hand_desc, winner.0, pot
+            "Showdown!\n{}\n\nCommunity cards: {}\n\n{} wins the pot of {} chips!",
+            hand_desc,
+            ui::format_community_cards(&state),
+            winners_str,
+            pot
         ))
     })
     .await

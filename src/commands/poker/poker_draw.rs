@@ -4,12 +4,13 @@ use serenity::{
             application_command::ApplicationCommandInteraction, InteractionResponseType,
             MessageFlags,
         },
-        ChannelId, GuildId,
     },
     prelude::Context,
 };
 
-use crate::{errors::GenericError, redis::poker, sql::structs::poker_hand_to_emojis};
+use crate::{commands::poker::hand_evaluator, errors::GenericError};
+
+use super::session;
 
 pub async fn poker_draw_handler(
     command: &ApplicationCommandInteraction,
@@ -21,17 +22,17 @@ pub async fn poker_draw_handler(
     let cid = command.channel_id;
     let uid = command.user.id;
 
-    if !poker::is_joinned(uid, guild_id, cid)
+    let state = session::load_state(guild_id, cid)
         .await
         .map_err(|e| GenericError::new(&e.to_string()))?
-    {
+        .ok_or(GenericError::new(&"No poker game found."))?;
+
+    if !state.players.contains(&uid.0) {
         respond_ephemeral(command, ctx, "You are not in this poker game.").await?;
         return Ok(());
     }
 
-    let embed = get_hand_embed(guild_id, cid, uid)
-        .await
-        .map_err(|e| GenericError::new(&e))?;
+    let embed = get_hand_embed(&state, uid);
 
     command
         .create_interaction_response(&ctx.http, |response| {
@@ -56,20 +57,34 @@ pub async fn poker_hand_handler(
     poker_draw_handler(command, ctx).await
 }
 
-async fn get_hand_embed(
-    guild_id: GuildId,
-    cid: ChannelId,
+fn get_hand_embed(
+    state: &session::PokerGameState,
     uid: serenity::model::prelude::UserId,
-) -> Result<serenity::builder::CreateEmbed, String> {
-    let hand = poker::get_user_hand(guild_id, cid, uid)
-        .await
-        .map_err(|e| e.to_string())?;
+) -> serenity::builder::CreateEmbed {
+    let hole_cards = state
+        .hole_cards
+        .get(&uid.0)
+        .cloned()
+        .unwrap_or_default();
+
+    let hole_str = if hole_cards.is_empty() {
+        "No hole cards yet.".to_string()
+    } else {
+        hole_cards
+            .iter()
+            .map(|&c| {
+                let eval = hand_evaluator::card_tuple_to_eval(crate::utils::deck::int_to_card(c));
+                hand_evaluator::card_to_emoji(eval)
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
 
     let mut embed = serenity::builder::CreateEmbed::default();
-    embed.title("Poker Hand");
-    embed.description(poker_hand_to_emojis(hand));
+    embed.title("Your Hole Cards");
+    embed.description(hole_str);
     embed.color(serenity::utils::Colour::DARK_GREEN);
-    Ok(embed)
+    embed
 }
 
 async fn respond_ephemeral(

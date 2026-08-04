@@ -9,9 +9,11 @@ use tracing::{trace, warn};
 use crate::errors::GenericError;
 
 pub mod betting;
+pub mod bot;
 pub mod components;
 pub mod flow;
 pub mod game;
+pub mod hand_evaluator;
 pub mod poker_discard;
 pub mod poker_draw;
 pub mod session;

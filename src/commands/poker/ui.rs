@@ -3,7 +3,35 @@ use serenity::{
     model::prelude::{component::ButtonStyle, ChannelId, GuildId, UserId},
 };
 
-use super::session::{Phase, PokerGameState};
+use super::{
+    bot::is_bot,
+    hand_evaluator,
+    session::{Phase, PokerGameState},
+};
+
+pub fn player_name(uid: UserId) -> String {
+    if is_bot(uid) {
+        "Bot".to_string()
+    } else {
+        format!("<@{}>", uid.0)
+    }
+}
+
+pub fn format_community_cards(state: &PokerGameState) -> String {
+    if state.community_cards.is_empty() {
+        return "None".to_string();
+    }
+
+    state
+        .community_cards
+        .iter()
+        .map(|&c| {
+            let eval = hand_evaluator::card_tuple_to_eval(crate::utils::deck::int_to_card(c));
+            hand_evaluator::card_to_emoji(eval)
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
 
 pub fn create_lobby_embed(state: &PokerGameState, seconds_remaining: u64) -> CreateEmbed {
     let mut embed = CreateEmbed::default();
@@ -14,7 +42,7 @@ pub fn create_lobby_embed(state: &PokerGameState, seconds_remaining: u64) -> Cre
         state
             .players
             .iter()
-            .map(|id| format!("<@{}>", id))
+            .map(|id| player_name(UserId::from(*id)))
             .collect::<Vec<_>>()
             .join(", ")
     ));
@@ -41,46 +69,54 @@ pub fn create_lobby_buttons(gid: GuildId, cid: ChannelId) -> Vec<CreateActionRow
     vec![row]
 }
 
-pub fn create_status_embed(state: &PokerGameState) -> CreateEmbed {
-    let mut embed = CreateEmbed::default();
+pub fn format_table_overview(state: &PokerGameState) -> String {
     let phase_name = match state.phase {
         Phase::Lobby => "Lobby",
-        Phase::FirstBet => "First Betting Round",
-        Phase::Draw => "Draw Phase",
-        Phase::SecondBet => "Second Betting Round",
+        Phase::PreFlop => "Pre-Flop",
+        Phase::Flop => "Flop",
+        Phase::Turn => "Turn",
+        Phase::River => "River",
         Phase::Showdown => "Showdown",
         Phase::Finished => "Finished",
     };
 
     let current = state
         .current_player()
-        .map(|u| format!("<@{}>", u.0))
+        .map(player_name)
         .unwrap_or_else(|| "None".to_string());
 
     let players = state
         .players
         .iter()
         .map(|id| {
+            let uid = UserId::from(*id);
             let folded = if state.folded.contains(id) {
                 " (folded)"
             } else {
                 ""
             };
             format!(
-                "<@{}>{} - bet: {}",
-                id,
+                "{} {} - bet: {}",
+                player_name(uid),
                 folded,
-                state.player_bet(UserId::from(*id))
+                state.player_bet(uid)
             )
         })
         .collect::<Vec<_>>()
         .join("\n");
 
-    embed.title(format!("Poker Game - {}", phase_name));
-    embed.description(format!(
-        "Pot: **{}**\nCurrent bet: **{}**\nCurrent turn: {}\n\n{}",
-        state.pot, state.current_bet, current, players
-    ));
+    let community = format_community_cards(state);
+
+    format!(
+        "Phase: {}\nPot: **{}**\nCurrent bet: **{}**\nCurrent turn: {}\nCommunity cards: {}\n\n{}",
+        phase_name, state.pot, state.current_bet, current, community, players
+    )
+}
+
+pub fn create_status_embed(state: &PokerGameState) -> CreateEmbed {
+    let mut embed = CreateEmbed::default();
+    embed.title("Poker Table");
+    embed.description(format_table_overview(state));
     embed.color(serenity::utils::Colour::DARK_GREEN);
     embed
 }
@@ -122,6 +158,12 @@ pub fn create_action_buttons(gid: GuildId, cid: ChannelId, uid: UserId) -> Vec<C
         .style(ButtonStyle::Danger)
         .custom_id(format!("poker:allin:{}:{}:{}", gid, cid, uid));
 
+    let mut show_cards_button = CreateButton::default();
+    show_cards_button
+        .label("Show Cards")
+        .style(ButtonStyle::Secondary)
+        .custom_id(format!("poker:showcards:{}:{}:{}", gid, cid, uid));
+
     let mut row1 = CreateActionRow::default();
     row1.add_button(fold_button);
     row1.add_button(checkcall_button);
@@ -133,17 +175,26 @@ pub fn create_action_buttons(gid: GuildId, cid: ChannelId, uid: UserId) -> Vec<C
 
     let mut row3 = CreateActionRow::default();
     row3.add_button(allin_button);
+    row3.add_button(show_cards_button);
 
     vec![row1, row2, row3]
 }
 
-pub fn create_draw_embed(hand_emoji: &str) -> CreateEmbed {
-    let mut embed = CreateEmbed::default();
-    embed.title("Draw Phase");
-    embed.description(format!(
-        "Your hand:\n{}\n\nUse `/pdiscard` to replace cards (e.g. `1 3 5`).",
-        hand_emoji
+pub fn create_action_prompt_embed(state: &PokerGameState, uid: UserId) -> CreateEmbed {
+    let mut prompt = CreateEmbed::default();
+    prompt.title(format!("{}'s Turn", player_name(uid)));
+    prompt.description(format!(
+        "{}\n\nChoose your action below. Use **Show Cards** to view your hand privately.",
+        format_table_overview(state)
     ));
+    prompt.color(serenity::utils::Colour::GOLD);
+    prompt
+}
+
+pub fn create_hand_embed(hand_emoji: &str) -> CreateEmbed {
+    let mut embed = CreateEmbed::default();
+    embed.title("Your Hand");
+    embed.description(hand_emoji);
     embed.color(serenity::utils::Colour::BLUE);
     embed
 }
@@ -160,7 +211,7 @@ pub fn create_showdown_embed(winners: &[(UserId, String)], pot: u64) -> CreateEm
             if winners.len() > 1 { "s" } else { "" },
             winners
                 .iter()
-                .map(|(u, hand)| format!("<@{}> with {}", u.0, hand))
+                .map(|(u, hand)| format!("{} with {}", player_name(*u), hand))
                 .collect::<Vec<_>>()
                 .join("\n")
         )
@@ -173,7 +224,24 @@ pub fn create_showdown_embed(winners: &[(UserId, String)], pot: u64) -> CreateEm
 pub fn create_timeout_embed(uid: UserId) -> CreateEmbed {
     let mut embed = CreateEmbed::default();
     embed.title("Turn Timed Out");
-    embed.description(format!("<@{}> took too long and folded.", uid.0));
+    embed.description(format!("{} took too long and folded.", player_name(uid)));
     embed.color(serenity::utils::Colour::DARK_RED);
+    embed
+}
+
+pub fn create_action_result_embed(
+    state: &PokerGameState,
+    actor: UserId,
+    action_text: &str,
+) -> CreateEmbed {
+    let mut embed = CreateEmbed::default();
+    embed.title("Player Action");
+    embed.description(format!(
+        "{} {}\n\n{}",
+        player_name(actor),
+        action_text,
+        format_table_overview(state)
+    ));
+    embed.color(serenity::utils::Colour::DARK_GREEN);
     embed
 }
