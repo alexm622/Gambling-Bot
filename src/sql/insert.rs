@@ -50,5 +50,5 @@ pub async fn insert_roulette_bet(bet: RouletteBet) -> Result<(), GenericError> {
         },
         Err(e) => return Err(GenericError::new(&e.to_string().clone())),
     };
-    return ret;
+    ret
 }

@@ -98,7 +98,7 @@ pub fn primative_to_deck(deck_primative: Vec<u8>) -> Deck {
         deck.deck.push(int_to_card(i));
     }
 
-    return deck;
+    deck
 }
 
 //delete a deck

@@ -21,7 +21,7 @@ impl EvalCard {
 
 impl PartialOrd for EvalCard {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.rank.cmp(&other.rank))
+        Some(self.cmp(other))
     }
 }
 
@@ -88,11 +88,16 @@ fn evaluate_five(cards: &[EvalCard]) -> Vec<u8> {
     // sort by count desc, then rank desc
     count_groups.sort_by(|a, b| b.1.cmp(&a.1).then(b.0.cmp(&a.0)));
 
-    let is_flush = cards.iter().map(|c| c.suit).collect::<std::collections::HashSet<_>>().len() == 1;
+    let is_flush = cards
+        .iter()
+        .map(|c| c.suit)
+        .collect::<std::collections::HashSet<_>>()
+        .len()
+        == 1;
     let straight_high = check_straight(&ranks);
 
-    if is_flush && straight_high.is_some() {
-        return vec![8, straight_high.unwrap()];
+    if let (true, Some(high)) = (is_flush, straight_high) {
+        return vec![8, high];
     }
 
     // four of a kind
@@ -230,9 +235,43 @@ pub fn card_to_emoji(card: EvalCard) -> String {
     format!("{}{}", rank, suit)
 }
 
+/// Format cards as Discord custom emoji (two-line colored card faces).
+pub fn cards_to_discord_emojis(cards: &[EvalCard]) -> String {
+    use crate::utils::card_ascii::{BLACK_CARDS, RED_CARDS, SUITES};
+
+    let mut values = String::new();
+    let mut suits = String::new();
+    for card in cards {
+        let idx = match card.rank {
+            14 => 0,
+            2..=13 => (card.rank - 1) as usize,
+            _ => 0,
+        };
+        let value = match card.suit {
+            0 | 1 => RED_CARDS[idx],
+            _ => BLACK_CARDS[idx],
+        };
+        values.push_str(value);
+        values.push(' ');
+        suits.push_str(SUITES[card.suit as usize]);
+        suits.push(' ');
+    }
+    format!("{}\n{}", values, suits)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn c(rank: Rank, suit: Suit) -> EvalCard {
+        EvalCard::new(rank, suit)
+    }
+
+    /// Build a 7-card hand from 5 "core" cards plus two junk cards that
+    /// don't interact (different suits, off-straight ranks).
+    fn seven(core: [EvalCard; 5], junk: [EvalCard; 2]) -> Vec<EvalCard> {
+        core.iter().chain(junk.iter()).copied().collect()
+    }
 
     #[test]
     fn test_royal_flush_beats_straight_flush() {
@@ -278,5 +317,321 @@ mod tests {
             EvalCard::new(3, 0),
         ];
         assert!(evaluate_seven(&pair) > evaluate_seven(&high));
+    }
+
+    #[test]
+    fn test_discord_emojis_format() {
+        let cards = vec![
+            EvalCard::new(14, 0), // Ace of diamonds (red)
+            EvalCard::new(13, 3), // King of spades (black)
+        ];
+        let emoji = cards_to_discord_emojis(&cards);
+        assert!(emoji.contains("<:rA:"));
+        assert!(emoji.contains("<:s_diamonds:"));
+        assert!(emoji.contains("<:bK:"));
+        assert!(emoji.contains("<:s_spades:"));
+        assert!(emoji.contains('\n'));
+    }
+
+    // ---- category detection ----
+
+    #[test]
+    fn detects_straight_flush() {
+        let hand = seven(
+            [c(9, 2), c(8, 2), c(7, 2), c(6, 2), c(5, 2)],
+            [c(14, 0), c(13, 1)],
+        );
+        assert_eq!(evaluate_seven(&hand)[0], 8);
+    }
+
+    #[test]
+    fn detects_four_of_a_kind_with_kicker() {
+        let hand = seven(
+            [c(9, 0), c(9, 1), c(9, 2), c(9, 3), c(14, 0)],
+            [c(2, 1), c(3, 2)],
+        );
+        assert_eq!(evaluate_seven(&hand), vec![7, 9, 14]);
+    }
+
+    #[test]
+    fn detects_full_house() {
+        let hand = seven(
+            [c(10, 0), c(10, 1), c(10, 2), c(4, 0), c(4, 1)],
+            [c(7, 3), c(13, 0)],
+        );
+        assert_eq!(evaluate_seven(&hand), vec![6, 10, 4]);
+    }
+
+    #[test]
+    fn detects_flush() {
+        let hand = seven(
+            [c(14, 1), c(11, 1), c(9, 1), c(6, 1), c(2, 1)],
+            [c(3, 0), c(4, 2)],
+        );
+        let rank = evaluate_seven(&hand);
+        assert_eq!(rank, vec![5, 14, 11, 9, 6, 2]);
+    }
+
+    #[test]
+    fn detects_straight() {
+        let hand = seven(
+            [c(10, 0), c(9, 1), c(8, 2), c(7, 0), c(6, 1)],
+            [c(2, 2), c(14, 3)],
+        );
+        assert_eq!(evaluate_seven(&hand), vec![4, 10]);
+    }
+
+    #[test]
+    fn detects_wheel_straight_ace_low() {
+        let hand = seven(
+            [c(14, 0), c(2, 1), c(3, 2), c(4, 0), c(5, 1)],
+            [c(9, 2), c(11, 3)],
+        );
+        assert_eq!(evaluate_seven(&hand), vec![4, 5]);
+    }
+
+    #[test]
+    fn detects_three_of_a_kind_with_kickers() {
+        let hand = seven(
+            [c(8, 0), c(8, 1), c(8, 2), c(14, 0), c(11, 1)],
+            [c(2, 2), c(4, 3)],
+        );
+        assert_eq!(evaluate_seven(&hand), vec![3, 8, 14, 11]);
+    }
+
+    #[test]
+    fn detects_two_pair_with_kicker() {
+        let hand = seven(
+            [c(12, 0), c(12, 1), c(5, 2), c(5, 0), c(9, 1)],
+            [c(2, 2), c(3, 3)],
+        );
+        assert_eq!(evaluate_seven(&hand), vec![2, 12, 5, 9]);
+    }
+
+    #[test]
+    fn detects_pair_with_kickers() {
+        let hand = seven(
+            [c(11, 0), c(11, 1), c(14, 2), c(9, 0), c(4, 1)],
+            [c(2, 2), c(6, 3)],
+        );
+        assert_eq!(evaluate_seven(&hand), vec![1, 11, 14, 9, 6]);
+    }
+
+    #[test]
+    fn detects_high_card() {
+        let hand = seven(
+            [c(14, 0), c(12, 1), c(9, 2), c(6, 0), c(3, 1)],
+            [c(2, 2), c(4, 3)],
+        );
+        assert_eq!(evaluate_seven(&hand), vec![0, 14, 12, 9, 6, 4]);
+    }
+
+    // ---- category ordering ----
+
+    #[test]
+    fn category_ordering_holds() {
+        let straight_flush = seven(
+            [c(9, 2), c(8, 2), c(7, 2), c(6, 2), c(5, 2)],
+            [c(2, 0), c(3, 1)],
+        );
+        let quads = seven(
+            [c(9, 0), c(9, 1), c(9, 2), c(9, 3), c(2, 0)],
+            [c(3, 1), c(4, 2)],
+        );
+        let full_house = seven(
+            [c(9, 0), c(9, 1), c(9, 2), c(2, 0), c(2, 1)],
+            [c(3, 2), c(4, 3)],
+        );
+        let flush = seven(
+            [c(14, 1), c(11, 1), c(9, 1), c(6, 1), c(2, 1)],
+            [c(3, 0), c(4, 2)],
+        );
+        let straight = seven(
+            [c(10, 0), c(9, 1), c(8, 2), c(7, 0), c(6, 1)],
+            [c(2, 2), c(14, 3)],
+        );
+        let trips = seven(
+            [c(8, 0), c(8, 1), c(8, 2), c(14, 0), c(11, 1)],
+            [c(2, 2), c(4, 3)],
+        );
+        let two_pair = seven(
+            [c(12, 0), c(12, 1), c(5, 2), c(5, 0), c(9, 1)],
+            [c(2, 2), c(3, 3)],
+        );
+        let pair = seven(
+            [c(11, 0), c(11, 1), c(14, 2), c(9, 0), c(4, 1)],
+            [c(2, 2), c(6, 3)],
+        );
+        let high = seven(
+            [c(14, 0), c(12, 1), c(9, 2), c(6, 0), c(3, 1)],
+            [c(2, 2), c(4, 3)],
+        );
+
+        let ordered = [
+            &straight_flush,
+            &quads,
+            &full_house,
+            &flush,
+            &straight,
+            &trips,
+            &two_pair,
+            &pair,
+            &high,
+        ];
+        for w in ordered.windows(2) {
+            assert!(
+                evaluate_seven(w[0]) > evaluate_seven(w[1]),
+                "category ordering violated"
+            );
+        }
+    }
+
+    // ---- tie breaking ----
+
+    #[test]
+    fn higher_pair_wins() {
+        let aces = seven(
+            [c(14, 0), c(14, 1), c(9, 2), c(6, 0), c(3, 1)],
+            [c(2, 2), c(4, 3)],
+        );
+        let kings = seven(
+            [c(13, 0), c(13, 1), c(9, 2), c(6, 0), c(3, 1)],
+            [c(2, 2), c(4, 3)],
+        );
+        assert!(evaluate_seven(&aces) > evaluate_seven(&kings));
+    }
+
+    #[test]
+    fn same_pair_kicker_decides() {
+        let ace_kicker = seven(
+            [c(11, 0), c(11, 1), c(14, 2), c(9, 0), c(4, 1)],
+            [c(2, 2), c(6, 3)],
+        );
+        let king_kicker = seven(
+            [c(11, 2), c(11, 3), c(13, 0), c(9, 1), c(4, 2)],
+            [c(2, 0), c(6, 1)],
+        );
+        assert!(evaluate_seven(&ace_kicker) > evaluate_seven(&king_kicker));
+    }
+
+    #[test]
+    fn two_pair_higher_top_pair_wins() {
+        let aces_up = seven(
+            [c(14, 0), c(14, 1), c(2, 2), c(2, 0), c(9, 1)],
+            [c(3, 2), c(4, 3)],
+        );
+        let kings_up = seven(
+            [c(13, 0), c(13, 1), c(12, 2), c(12, 0), c(9, 1)],
+            [c(3, 2), c(4, 3)],
+        );
+        assert!(evaluate_seven(&aces_up) > evaluate_seven(&kings_up));
+    }
+
+    #[test]
+    fn identical_hands_tie() {
+        let a = seven(
+            [c(10, 0), c(10, 1), c(14, 2), c(9, 0), c(4, 1)],
+            [c(2, 2), c(6, 3)],
+        );
+        let b = seven(
+            [c(10, 2), c(10, 3), c(14, 0), c(9, 1), c(4, 2)],
+            [c(2, 0), c(6, 1)],
+        );
+        assert_eq!(evaluate_seven(&a), evaluate_seven(&b));
+    }
+
+    #[test]
+    fn straight_higher_top_card_wins() {
+        let broadway = seven(
+            [c(14, 0), c(13, 1), c(12, 2), c(11, 0), c(10, 1)],
+            [c(2, 2), c(3, 3)],
+        );
+        let wheel = seven(
+            [c(14, 1), c(2, 0), c(3, 1), c(4, 2), c(5, 0)],
+            [c(9, 2), c(11, 3)],
+        );
+        assert!(evaluate_seven(&broadway) > evaluate_seven(&wheel));
+    }
+
+    // ---- best 5 of 7 ----
+
+    #[test]
+    fn picks_best_five_of_seven() {
+        // two pair on board + pocket aces -> two pair, aces up
+        let hand = vec![
+            c(14, 0),
+            c(14, 1), // pocket aces
+            c(13, 2),
+            c(13, 0), // board pair of kings
+            c(2, 1),
+            c(7, 2),
+            c(9, 3),
+        ];
+        assert_eq!(evaluate_seven(&hand), vec![2, 14, 13, 9]);
+    }
+
+    #[test]
+    fn three_of_a_kind_on_board_plus_pair_is_full_house() {
+        let hand = vec![
+            c(8, 0),
+            c(8, 1),
+            c(8, 2), // trips on board
+            c(5, 0),
+            c(5, 1), // pocket pair
+            c(11, 2),
+            c(3, 3),
+        ];
+        assert_eq!(evaluate_seven(&hand), vec![6, 8, 5]);
+    }
+
+    #[test]
+    fn four_flush_cards_do_not_make_a_flush() {
+        let hand = vec![
+            c(14, 1),
+            c(11, 1),
+            c(9, 1),
+            c(6, 1), // only four hearts
+            c(2, 0),
+            c(3, 2),
+            c(4, 3),
+        ];
+        assert_eq!(evaluate_seven(&hand)[0], 0); // high card
+    }
+
+    // ---- helpers ----
+
+    #[test]
+    fn rank_to_string_covers_all_categories() {
+        let cases = [
+            (8, "Straight Flush"),
+            (7, "Four of a Kind"),
+            (6, "Full House"),
+            (5, "Flush"),
+            (4, "Straight"),
+            (3, "Three of a Kind"),
+            (2, "Two Pair"),
+            (1, "Pair"),
+            (0, "High Card"),
+        ];
+        for (cat, name) in cases {
+            assert_eq!(rank_to_string(&[cat]), name);
+        }
+        assert_eq!(rank_to_string(&[]), "Unknown");
+    }
+
+    #[test]
+    fn card_to_emoji_formats_ranks_and_suits() {
+        assert_eq!(card_to_emoji(c(14, 0)), "A♦");
+        assert_eq!(card_to_emoji(c(13, 1)), "K♥");
+        assert_eq!(card_to_emoji(c(10, 2)), "10♣");
+        assert_eq!(card_to_emoji(c(2, 3)), "2♠");
+    }
+
+    #[test]
+    fn card_tuple_to_eval_maps_ace_high() {
+        use crate::sql::structs::{Card, Suite};
+        assert_eq!(card_tuple_to_eval((Card::ONE, Suite::SPADES)), c(14, 3));
+        assert_eq!(card_tuple_to_eval((Card::KING, Suite::HEARTS)), c(13, 1));
+        assert_eq!(card_tuple_to_eval((Card::TWO, Suite::DIAMONDS)), c(2, 0));
     }
 }

@@ -15,7 +15,7 @@ pub async fn get_db_link() -> String {
     let user = get_secret("MYSQL_USER").value;
     let pass = get_secret("MYSQL_PASS").value;
     let ip = get_secret("MYSQL_IP").value;
-    return format!("mysql://{}:{}@{}/{}", user, pass, ip, db);
+    format!("mysql://{}:{}@{}/{}", user, pass, ip, db)
 }
 
 //initialize
@@ -43,12 +43,10 @@ pub async fn test_connection() -> Result<(), mysql_async::Error> {
     let pool = Pool::new(url.as_str());
 
     match pool.get_conn().await {
-        Ok(v) => {
-            return match v.disconnect().await {
-                Ok(_) => Ok(()),
-                Err(e) => Err(e),
-            }
-        }
-        Err(e) => return Err(e),
-    };
+        Ok(v) => match v.disconnect().await {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        },
+        Err(e) => Err(e),
+    }
 }

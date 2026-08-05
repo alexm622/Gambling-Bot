@@ -101,67 +101,24 @@ pub async fn register_commands(
             })
             //
             // POKER COMMANDS
-            //poker draw
-            .create_application_command(|command| {
-                command.name("pdraw").description("Draw cards for poker")
-            })
-            //poker fold
-            .create_application_command(|command| {
-                command
-                    .name("pfold")
-                    .description("Fold your hand for poker")
-            })
             //poker hand
             .create_application_command(|command| {
                 command
                     .name("phand")
                     .description("View your hand for poker")
             })
-            //poker raise
-            .create_application_command(|command| {
-                command
-                    .name("praise")
-                    .description("Raise your bet for poker")
-                    .create_option(|option| {
-                        option
-                            .name("bet")
-                            .description("The amount you want to raise your bet by")
-                            .kind(CommandOptionType::Integer)
-                            .required(true)
-                    })
-            })
-            //poker call
-            .create_application_command(|command| {
-                command
-                    .name("pcall")
-                    .description("Call the current bet for poker")
-            })
-            //poker check
-            .create_application_command(|command| {
-                command
-                    .name("pcheck")
-                    .description("Check the current bet for poker")
-            })
-            //poker all in
-            .create_application_command(|command| {
-                command.name("pallin").description("Go all in for poker")
-            })
-            //poker discard
-            .create_application_command(|command| {
-                command
-                    .name("pdiscard")
-                    .description("Discard cards for poker")
-                    .create_option(|option| {
-                        option
-                            .name("cards")
-                            .description("The cards you want to discard")
-                            .kind(CommandOptionType::String)
-                            .required(true)
-                    })
-            })
             //poker start
             .create_application_command(|command| {
-                command.name("pstart").description("Start a game of poker")
+                command
+                    .name("pstart")
+                    .description("Start a game of poker")
+                    .create_option(|option| {
+                        option
+                            .name("max_bet")
+                            .description("Maximum total chips a player can bet this hand")
+                            .kind(CommandOptionType::Integer)
+                            .required(false)
+                    })
             })
             //poker join
             .create_application_command(|command| {

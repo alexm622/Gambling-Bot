@@ -22,7 +22,7 @@ pub async fn table_exists(id: ChannelId) -> Result<bool, RedisError> {
         .arg(format!("roulette_{}", id.0))
         .query::<u8>(&mut conn)
     {
-        Ok(e) => Ok(if e == 1 { true } else { false }),
+        Ok(e) => Ok(e == 1),
         Err(e) => Err(e),
     }
 }
@@ -60,8 +60,6 @@ pub async fn spin_table(
             Err(e) => return Err(e),
         };
         //start a new thread to spin the table
-        let guild_id = guild_id.clone();
-        let id = id.clone();
         tokio::spawn(async move {
             match spin_table_thread(guild_id, id, ctx).await {
                 Ok(_) => {}
@@ -93,16 +91,13 @@ async fn spin_table_thread(guild_id: GuildId, id: ChannelId, ctx: Context) -> Re
 
     for mut bet in bets {
         bet_check(&mut bet, spin_result);
-        new_vec.push(bet.clone());
+        new_vec.push(bet);
         winners = format!(
-            "{}\n{}",
+            "{}\n{} {} {}!",
             winners,
-            format!(
-                "{} {} {}!",
-                Mention::from(UserId::from(bet.user_id)),
-                if bet.net < 0 { "lost" } else { "won" },
-                bet.net.abs()
-            )
+            Mention::from(UserId::from(bet.user_id)),
+            if bet.net < 0 { "lost" } else { "won" },
+            bet.net.abs()
         )
     }
 

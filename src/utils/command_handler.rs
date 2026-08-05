@@ -68,7 +68,7 @@ pub enum CategoriesEnum {
 }
 
 impl CategoriesEnum {
-    pub fn from_str(category: &str) -> CategoriesEnum {
+    pub fn from_name(category: &str) -> CategoriesEnum {
         match category {
             "money" => CategoriesEnum::Money,
             "roulette" => CategoriesEnum::Roulette,
@@ -86,10 +86,70 @@ fn command_to_category(command: &str) -> CategoriesEnum {
     match command {
         "bal" | "reset_bal" | "reset_user_bal" => CategoriesEnum::Money,
         "roulette" | "roulette_odds" | "roulette_table" => CategoriesEnum::Roulette,
-        "pstart" | "pjoin" | "pleave" | "pdraw" | "phand" | "pdiscard" | "pfold" | "pcheck"
-        | "pcall" | "praise" | "pallin" => CategoriesEnum::Poker,
+        "pstart" | "pjoin" | "pleave" | "phand" => CategoriesEnum::Poker,
         "slots" => CategoriesEnum::Slots,
         "blackjack" => CategoriesEnum::Blackjack,
         _ => CategoriesEnum::InvalidCategory,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn commands_route_to_their_category() {
+        for cmd in ["bal", "reset_bal", "reset_user_bal"] {
+            assert!(
+                matches!(command_to_category(cmd), CategoriesEnum::Money),
+                "{}",
+                cmd
+            );
+        }
+        for cmd in ["roulette", "roulette_odds", "roulette_table"] {
+            assert!(
+                matches!(command_to_category(cmd), CategoriesEnum::Roulette),
+                "{}",
+                cmd
+            );
+        }
+        for cmd in ["pstart", "pjoin", "pleave", "phand"] {
+            assert!(
+                matches!(command_to_category(cmd), CategoriesEnum::Poker),
+                "{}",
+                cmd
+            );
+        }
+        assert!(matches!(
+            command_to_category("slots"),
+            CategoriesEnum::Slots
+        ));
+        assert!(matches!(
+            command_to_category("blackjack"),
+            CategoriesEnum::Blackjack
+        ));
+    }
+
+    #[test]
+    fn unknown_commands_are_invalid() {
+        for cmd in ["", "pdance", "BAL", "roulette_"] {
+            assert!(
+                matches!(command_to_category(cmd), CategoriesEnum::InvalidCategory),
+                "{}",
+                cmd
+            );
+        }
+    }
+
+    #[test]
+    fn category_from_str() {
+        assert!(matches!(
+            CategoriesEnum::from_name("poker"),
+            CategoriesEnum::Poker
+        ));
+        assert!(matches!(
+            CategoriesEnum::from_name("nope"),
+            CategoriesEnum::InvalidCategory
+        ));
     }
 }

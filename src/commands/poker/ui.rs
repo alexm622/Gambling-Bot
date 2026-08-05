@@ -22,15 +22,12 @@ pub fn format_community_cards(state: &PokerGameState) -> String {
         return "None".to_string();
     }
 
-    state
+    let cards: Vec<_> = state
         .community_cards
         .iter()
-        .map(|&c| {
-            let eval = hand_evaluator::card_tuple_to_eval(crate::utils::deck::int_to_card(c));
-            hand_evaluator::card_to_emoji(eval)
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
+        .map(|&c| hand_evaluator::card_tuple_to_eval(crate::utils::deck::int_to_card(c)))
+        .collect();
+    hand_evaluator::cards_to_discord_emojis(&cards)
 }
 
 pub fn create_lobby_embed(state: &PokerGameState, seconds_remaining: u64) -> CreateEmbed {
@@ -108,7 +105,7 @@ pub fn format_table_overview(state: &PokerGameState) -> String {
     let community = format_community_cards(state);
 
     format!(
-        "Phase: {}\nPot: **{}**\nCurrent bet: **{}**\nCurrent turn: {}\nCommunity cards: {}\n\n{}",
+        "Phase: {}\nPot: **{}**\nCurrent bet: **{}**\nCurrent turn: {}\nCommunity cards:\n{}\n\nPlayers:\n{}",
         phase_name, state.pot, state.current_bet, current, community, players
     )
 }
@@ -199,28 +196,6 @@ pub fn create_hand_embed(hand_emoji: &str) -> CreateEmbed {
     embed
 }
 
-pub fn create_showdown_embed(winners: &[(UserId, String)], pot: u64) -> CreateEmbed {
-    let mut embed = CreateEmbed::default();
-    embed.title("Showdown");
-    let desc = if winners.is_empty() {
-        "No winners.".to_string()
-    } else {
-        format!(
-            "Pot: **{}**\nWinner{}: {}",
-            pot,
-            if winners.len() > 1 { "s" } else { "" },
-            winners
-                .iter()
-                .map(|(u, hand)| format!("{} with {}", player_name(*u), hand))
-                .collect::<Vec<_>>()
-                .join("\n")
-        )
-    };
-    embed.description(desc);
-    embed.color(serenity::utils::Colour::GOLD);
-    embed
-}
-
 pub fn create_timeout_embed(uid: UserId) -> CreateEmbed {
     let mut embed = CreateEmbed::default();
     embed.title("Turn Timed Out");
@@ -244,4 +219,47 @@ pub fn create_action_result_embed(
     ));
     embed.color(serenity::utils::Colour::DARK_GREEN);
     embed
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::commands::poker::session::BOT_USER_ID;
+
+    #[test]
+    fn player_name_distinguishes_bot() {
+        assert_eq!(player_name(UserId::from(BOT_USER_ID)), "Bot");
+        assert_eq!(player_name(UserId::from(123)), "<@123>");
+    }
+
+    #[test]
+    fn community_cards_empty_shows_none() {
+        let state = PokerGameState::new(UserId::from(1));
+        assert_eq!(format_community_cards(&state), "None");
+    }
+
+    #[test]
+    fn table_overview_shows_phase_pot_and_players() {
+        let mut state = PokerGameState::new(UserId::from(1));
+        state.add_player(UserId::from(2));
+        state.advance_phase(); // -> PreFlop
+        state.place_bet(UserId::from(1), 50);
+
+        let overview = format_table_overview(&state);
+        assert!(overview.contains("Phase: Pre-Flop"), "{}", overview);
+        assert!(overview.contains("Pot: **50**"), "{}", overview);
+        assert!(overview.contains("<@1>"), "{}", overview);
+        assert!(overview.contains("<@2>"), "{}", overview);
+        assert!(!overview.contains("(folded)"), "{}", overview);
+    }
+
+    #[test]
+    fn table_overview_marks_folded_players() {
+        let mut state = PokerGameState::new(UserId::from(1));
+        state.add_player(UserId::from(2));
+        state.fold(UserId::from(2));
+
+        let overview = format_table_overview(&state);
+        assert!(overview.contains("<@2>  (folded)"), "{}", overview);
+    }
 }

@@ -73,26 +73,10 @@ pub async fn set_bal(id: UserId, gid: GuildId, bal: i64) -> Result<(), RedisErro
     }
 }
 
-//check if a user exists
-pub async fn user_exists(id: UserId) -> Result<bool, RedisError> {
-    let mut conn = match get_conn().await {
-        Ok(v) => v,
-        Err(e) => return Err(e),
-    };
-
-    match redis::cmd("EXISTS")
-        .arg(format!("user_{}", id.0))
-        .query::<u8>(&mut conn)
-    {
-        Ok(e) => Ok(if e == 1 { true } else { false }),
-        Err(e) => Err(e),
-    }
-}
-
 //add i64 to userid
 pub async fn user_add(id: UserId, gid: GuildId, add: i64) -> Result<(), RedisError> {
     let bal: i64 = match get_user_bal(id, gid).await {
-        Ok(v) => v as i64 + add,
+        Ok(v) => v + add,
         Err(e) => return Err(e),
     };
 

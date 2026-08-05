@@ -16,7 +16,7 @@ pub async fn roulette_command_handler(
 ) -> Result<(), GenericError> {
     let name = command.data.name.clone();
 
-    match RouletteCommandsEnum::from_str(&name) {
+    match RouletteCommandsEnum::from_name(&name) {
         // place a bet
         RouletteCommandsEnum::Roulette => {
             trace!("roulette called");
@@ -30,7 +30,7 @@ pub async fn roulette_command_handler(
             .await
             .map_err(|e| {
                 warn!("error getting bet embed: {}", e);
-                return GenericError::new(&format!("error getting bet embed: {}", e));
+                GenericError::new(&format!("error getting bet embed: {}", e))
             })?;
             match command.create_interaction_response(ctx, |response| {
                 response.kind(serenity::model::prelude::interaction::InteractionResponseType::ChannelMessageWithSource);
@@ -82,7 +82,7 @@ pub enum RouletteCommandsEnum {
 }
 
 impl RouletteCommandsEnum {
-    pub fn from_str(command: &str) -> RouletteCommandsEnum {
+    pub fn from_name(command: &str) -> RouletteCommandsEnum {
         match command {
             "roulette" => RouletteCommandsEnum::Roulette,
             "roulette_odds" => RouletteCommandsEnum::RouletteOdds,

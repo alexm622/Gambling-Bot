@@ -21,66 +21,27 @@ pub async fn get_bet_embed(
     ctx: &serenity::client::Context,
 ) -> Result<serenity::builder::CreateEmbed, String> {
     //get bet amount
-
-    let bet_amount: i64;
-    match options.get(0) {
-        Some(v) => match v.resolved.as_ref() {
-            Some(v) => match v {
-                CommandDataOptionValue::Integer(i) => {
-                    bet_amount = *i;
-                }
-                _ => {
-                    return Err(String::from("Expected option to be an integer"));
-                }
-            },
-            None => {
-                return Err(String::from("Expected option to be an integer"));
-            }
-        },
-        None => {
-            return Err(String::from("Expected option to be an integer"));
-        }
+    let bet_amount: i64 = match options.first().and_then(|v| v.resolved.as_ref()) {
+        Some(CommandDataOptionValue::Integer(i)) => *i,
+        _ => return Err(String::from("Expected option to be an integer")),
     };
-    let mut bet_type: BettingTypesEnum;
 
-    match options.get(1) {
-        Some(v) => match v.resolved.as_ref() {
-            Some(v) => match v {
-                CommandDataOptionValue::String(s) => {
-                    bet_type = BettingTypesEnum::from_str(&s);
-                }
-                _ => {
-                    return Err(String::from("Expected option to be a string"));
-                }
-            },
-            None => {
-                return Err(String::from("Expected option to be a string"));
-            }
-        },
-        None => {
-            return Err(String::from("Expected option to be a string"));
-        }
+    let mut bet_type: BettingTypesEnum = match options.get(1).and_then(|v| v.resolved.as_ref()) {
+        Some(CommandDataOptionValue::String(s)) => BettingTypesEnum::from_name(s),
+        _ => return Err(String::from("Expected option to be a string")),
     };
 
     //parse for specific bet
     if bet_type.derive_integer() == 8 {
-        match options.get(2) {
-            Some(v) => match v.resolved.as_ref() {
-                Some(v) => match v {
-                    CommandDataOptionValue::Integer(i) => {
-                        bet_type = BettingTypesEnum::Specific(*i as u8);
-                    }
-                    _ => {
-                        return Err(String::from("Expected option to be an integer"));
-                    }
-                },
-                None => {
-                    return Err(String::from("Expected option to be an integer"));
+        bet_type = match options.get(2).and_then(|v| v.resolved.as_ref()) {
+            Some(CommandDataOptionValue::Integer(i)) => {
+                if (0..=36).contains(i) {
+                    BettingTypesEnum::Specific(*i as u8)
+                } else {
+                    BettingTypesEnum::Invalid
                 }
-            },
-            None => {
-                return Err(String::from("Expected option to be an integer"));
             }
+            _ => return Err(String::from("Expected option to be an integer")),
         };
     }
 
@@ -94,7 +55,7 @@ pub async fn get_bet_embed(
     }
 
     //this below halts
-    bet_handler(uid, cid, guild, bet_amount, bet_type.clone(), ctx)
+    bet_handler(uid, cid, guild, bet_amount, bet_type, ctx)
         .await
         .expect("error placing bet");
 
@@ -102,8 +63,7 @@ pub async fn get_bet_embed(
     embed.title("Bet Placed!");
     embed.description(format!(
         "You have placed a bet of {} on {}!",
-        bet_amount,
-        bet_type.to_string()
+        bet_amount, bet_type
     ));
     embed.color(serenity::utils::Colour::from_rgb(255, 0, 0));
     Ok(embed)
@@ -125,15 +85,12 @@ pub async fn bet_handler(
         channel_id: cid,
         guild_id: guild,
         bet_type: BettingTypes::from_bettingtypeenum(bet_type),
-        specific_bet: specific_bet,
+        specific_bet,
     };
 
-    let _res = match insert_roulette_bet(bet).await {
-        Err(e) => {
-            warn!("unable to place bet {}", e);
-            return Ok(());
-        }
-        Ok(_) => {}
+    if let Err(e) = insert_roulette_bet(bet).await {
+        warn!("unable to place bet {}", e);
+        return Ok(());
     };
 
     let _spin = spin_table(guild, cid, ctx.clone()).await;
@@ -154,7 +111,7 @@ pub enum BettingTypesEnum {
 }
 
 impl BettingTypesEnum {
-    pub fn from_str(bet_type: &str) -> BettingTypesEnum {
+    pub fn from_name(bet_type: &str) -> BettingTypesEnum {
         match bet_type {
             "red" => BettingTypesEnum::Red,
             "black" => BettingTypesEnum::Black,
@@ -163,7 +120,8 @@ impl BettingTypesEnum {
             "odd" => BettingTypesEnum::Odd,
             "low" => BettingTypesEnum::Low,
             "high" => BettingTypesEnum::High,
-            "specific" => BettingTypesEnum::Specific(0),
+            // "number" is what the /roulette slash command sends for single-number bets
+            "specific" | "number" => BettingTypesEnum::Specific(0),
             _ => match bet_type.parse::<u8>() {
                 Ok(v) => {
                     if v > 36 {
@@ -217,5 +175,97 @@ impl std::fmt::Display for BettingTypesEnum {
             BettingTypesEnum::Specific(v) => write!(f, "{}", v),
             BettingTypesEnum::Invalid => write!(f, "Invalid"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn from_name_parses_all_slash_command_choices() {
+        // these are the exact strings offered by the /roulette command registration
+        assert_eq!(BettingTypesEnum::from_name("red"), BettingTypesEnum::Red);
+        assert_eq!(
+            BettingTypesEnum::from_name("black"),
+            BettingTypesEnum::Black
+        );
+        assert_eq!(
+            BettingTypesEnum::from_name("green"),
+            BettingTypesEnum::Green
+        );
+        assert_eq!(BettingTypesEnum::from_name("even"), BettingTypesEnum::Even);
+        assert_eq!(BettingTypesEnum::from_name("odd"), BettingTypesEnum::Odd);
+        assert_eq!(BettingTypesEnum::from_name("low"), BettingTypesEnum::Low);
+        assert_eq!(BettingTypesEnum::from_name("high"), BettingTypesEnum::High);
+        assert_eq!(
+            BettingTypesEnum::from_name("number"),
+            BettingTypesEnum::Specific(0)
+        );
+    }
+
+    #[test]
+    fn from_name_parses_numbers() {
+        assert_eq!(
+            BettingTypesEnum::from_name("0"),
+            BettingTypesEnum::Specific(0)
+        );
+        assert_eq!(
+            BettingTypesEnum::from_name("17"),
+            BettingTypesEnum::Specific(17)
+        );
+        assert_eq!(
+            BettingTypesEnum::from_name("36"),
+            BettingTypesEnum::Specific(36)
+        );
+    }
+
+    #[test]
+    fn from_name_rejects_invalid() {
+        for s in ["37", "abc", "", "-1"] {
+            assert_eq!(
+                BettingTypesEnum::from_name(s),
+                BettingTypesEnum::Invalid,
+                "expected {} to be invalid",
+                s
+            );
+        }
+    }
+
+    #[test]
+    fn betting_types_map_to_bet_check_ids() {
+        // bet_check in utils::roulette matches on these exact u8 values
+        assert_eq!(
+            BettingTypes::from_bettingtypeenum(BettingTypesEnum::Red) as u8,
+            0
+        );
+        assert_eq!(
+            BettingTypes::from_bettingtypeenum(BettingTypesEnum::Black) as u8,
+            1
+        );
+        assert_eq!(
+            BettingTypes::from_bettingtypeenum(BettingTypesEnum::Even) as u8,
+            2
+        );
+        assert_eq!(
+            BettingTypes::from_bettingtypeenum(BettingTypesEnum::Odd) as u8,
+            3
+        );
+        assert_eq!(
+            BettingTypes::from_bettingtypeenum(BettingTypesEnum::Low) as u8,
+            4
+        );
+        assert_eq!(
+            BettingTypes::from_bettingtypeenum(BettingTypesEnum::High) as u8,
+            5
+        );
+        assert_eq!(
+            BettingTypes::from_bettingtypeenum(BettingTypesEnum::Specific(7)) as u8,
+            6
+        );
+        assert_eq!(
+            BettingTypes::from_bettingtypeenum(BettingTypesEnum::Green) as u8,
+            7
+        );
     }
 }

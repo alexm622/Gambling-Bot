@@ -1,14 +1,15 @@
 use serenity::{
     builder::CreateEmbed,
     model::prelude::interaction::{
-        application_command::ApplicationCommandInteraction, InteractionResponseType, MessageFlags,
+        application_command::{ApplicationCommandInteraction, CommandDataOptionValue},
+        InteractionResponseType,
     },
     prelude::Context,
 };
 use tracing::trace;
 
 use crate::{
-    commands::poker::{flow, session},
+    commands::poker::{flow, respond_ephemeral, session},
     errors::GenericError,
     redis::poker,
 };
@@ -49,7 +50,27 @@ pub async fn poker_start(
         .await
         .map_err(|e| GenericError::new(&e.to_string()))?;
 
-    flow::start_lobby(ctx, guild_id, cid, uid).await?;
+    let max_hand_bet = get_integer_option(&command.data.options, "max_bet").map(|v| v as u64);
+    if let Some(max) = max_hand_bet {
+        if max == 0 {
+            respond_ephemeral(command, ctx, "Maximum hand bet must be greater than 0.").await?;
+            return Ok(());
+        }
+        let bal = crate::redis::users::get_user_bal(uid, guild_id)
+            .await
+            .map_err(|e| GenericError::new(&e.to_string()))?;
+        if (bal as u64) < max {
+            respond_ephemeral(
+                command,
+                ctx,
+                "Maximum hand bet cannot exceed your current balance.",
+            )
+            .await?;
+            return Ok(());
+        }
+    }
+
+    flow::start_lobby(ctx, guild_id, cid, uid, max_hand_bet).await?;
 
     let embed = CreateEmbed::default()
         .title("Poker Lobby Opened")
@@ -92,36 +113,23 @@ pub async fn poker_leave(
         }
 
         state.remove_player(uid);
-        session::save_state(guild_id, cid, &state)
-            .await
-            .map_err(|e| GenericError::new(&e.to_string()))?;
+        session::save_state_or_err(guild_id, cid, &state).await?;
     }
-
-    poker::remove_user_from_joined(guild_id, cid, uid)
-        .await
-        .map_err(|e| GenericError::new(&e.to_string()))?;
-    poker::remove_user_hand(guild_id, cid, uid)
-        .await
-        .map_err(|e| GenericError::new(&e.to_string()))?;
-    poker::clear_user_bet(guild_id, cid, uid)
-        .await
-        .map_err(|e| GenericError::new(&e.to_string()))?;
 
     respond_ephemeral(command, ctx, "You have left the poker game.").await?;
     Ok(())
 }
 
-async fn respond_ephemeral(
-    command: &ApplicationCommandInteraction,
-    ctx: &Context,
-    content: &str,
-) -> Result<(), GenericError> {
-    command
-        .create_interaction_response(&ctx.http, |response| {
-            response
-                .kind(InteractionResponseType::ChannelMessageWithSource)
-                .interaction_response_data(|m| m.content(content).flags(MessageFlags::EPHEMERAL))
-        })
-        .await
-        .map_err(|e| GenericError::new(&e.to_string()))
+fn get_integer_option(
+    options: &[serenity::model::prelude::interaction::application_command::CommandDataOption],
+    name: &str,
+) -> Option<i64> {
+    for opt in options {
+        if opt.name == name {
+            if let Some(CommandDataOptionValue::Integer(v)) = opt.resolved.as_ref() {
+                return Some(*v);
+            }
+        }
+    }
+    None
 }

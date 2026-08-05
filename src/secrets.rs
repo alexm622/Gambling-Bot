@@ -23,7 +23,7 @@ pub fn get_secret(key: &str) -> Secret {
         key: String::from("none"),
         value: String::from("none"),
     };
-    return blank;
+    blank
 }
 
 pub struct Secret {

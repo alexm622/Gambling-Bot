@@ -15,7 +15,7 @@ pub async fn get_bal_embed(
 
     let user: User;
 
-    let option = options.get(0);
+    let option = options.first();
 
     match option {
         Some(v) => match v.resolved.as_ref() {

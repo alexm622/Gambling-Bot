@@ -3,7 +3,6 @@ use tracing::info;
 
 use crate::secrets::get_secret;
 
-pub mod channels;
 pub mod cleanup;
 pub mod decks;
 pub mod poker;
@@ -14,7 +13,7 @@ pub mod roulette;
 
 pub async fn get_db_link() -> String {
     let ip = get_secret("REDIS_IP").value;
-    return format!("redis://{}", ip);
+    format!("redis://{}", ip)
 }
 //test the connection to redis
 pub async fn test_connection() -> Result<(), Box<dyn std::error::Error>> {

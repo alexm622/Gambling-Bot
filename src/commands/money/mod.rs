@@ -22,7 +22,7 @@ pub async fn money_command_handler(
     trace!("guild id: {:?}", guild_id);
     trace!("user: {:?}", user);
 
-    match MoneyCommandsEnum::from_str(&name) {
+    match MoneyCommandsEnum::from_name(&name) {
         MoneyCommandsEnum::Balance => {
             let embed = bal::get_bal_embed(&command.data.options, guild_id, user)
                 .await
@@ -54,7 +54,7 @@ pub enum MoneyCommandsEnum {
 }
 
 impl MoneyCommandsEnum {
-    pub fn from_str(command: &str) -> MoneyCommandsEnum {
+    pub fn from_name(command: &str) -> MoneyCommandsEnum {
         match command {
             "bal" => MoneyCommandsEnum::Balance,
             _ => MoneyCommandsEnum::InvalidCommand,
