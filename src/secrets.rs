@@ -11,7 +11,7 @@ pub fn get_secret(key: &str) -> Secret {
             let sec_struct: Secret = Secret {
                 name: split[0].to_owned(),
                 key: split[1].to_owned(),
-                value: split[2].to_owned(),
+                value: split[2..].join(",")
             };
             return sec_struct;
         }
