@@ -84,7 +84,7 @@ impl CategoriesEnum {
 
 fn command_to_category(command: &str) -> CategoriesEnum {
     match command {
-        "bal" | "reset_bal" | "reset_user_bal" => CategoriesEnum::Money,
+        "bal" | "reset_bal" | "reset_user_bal" | "set_bal" => CategoriesEnum::Money,
         "roulette" | "roulette_odds" | "roulette_table" => CategoriesEnum::Roulette,
         "pstart" | "pjoin" | "pleave" | "phand" => CategoriesEnum::Poker,
         "slots" => CategoriesEnum::Slots,
@@ -99,7 +99,7 @@ mod tests {
 
     #[test]
     fn commands_route_to_their_category() {
-        for cmd in ["bal", "reset_bal", "reset_user_bal"] {
+        for cmd in ["bal", "reset_bal", "reset_user_bal", "set_bal"] {
             assert!(
                 matches!(command_to_category(cmd), CategoriesEnum::Money),
                 "{}",

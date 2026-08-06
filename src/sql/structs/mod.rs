@@ -69,6 +69,8 @@ pub struct BetResult {
     pub net: i64,
     pub bet_type: u8,
     pub specific_bet: Option<u8>,
+    pub channel_id: u64,
+    pub guild_id: u64,
 }
 
 impl fmt::Display for BetResult {

@@ -6,7 +6,11 @@ use serenity::{
 };
 use tracing::{info, warn};
 
-use crate::{commands::poker::components::handle_poker_component, errors::GenericError};
+use crate::{
+    commands::money::handle_money_component,
+    commands::poker::components::handle_poker_component,
+    errors::GenericError,
+};
 
 pub async fn component_handler(
     component: MessageComponentInteraction,
@@ -23,6 +27,13 @@ pub async fn component_handler(
     // route poker buttons by custom_id prefix
     if component.data.custom_id.starts_with("poker:") {
         return handle_poker_component(&component, ctx).await;
+    }
+
+    // route money command confirmations
+    if component.data.custom_id.starts_with("reset_bal:")
+        || component.data.custom_id.starts_with("reset_user_bal:")
+    {
+        return handle_money_component(&component, ctx).await;
     }
 
     warn!("unhandled component: {}", component.data.custom_id);

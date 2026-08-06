@@ -4,11 +4,11 @@ use redis::RedisError;
 use serenity::model::prelude::{GuildId, UserId};
 use tracing::log::warn;
 
-use crate::sql::structs::BetResult;
+use crate::sql::{structs::BetResult, transactions::log_transaction};
 
 use super::get_conn;
 
-const STARTING_BAL: i64 = 10000;
+pub const STARTING_BAL: i64 = 10000;
 
 //get the balance of user (uid)
 pub async fn get_user_bal(id: UserId, gid: GuildId) -> Result<i64, RedisError> {
@@ -91,11 +91,30 @@ pub async fn apply_winnings(winnings: Vec<BetResult>, gid: GuildId) {
     for win in winnings {
         if win.net > 0 {
             match user_add(UserId::from(win.user_id), gid, win.net).await {
-                Ok(_) => {}
+                Ok(_) => {
+                    if let Err(e) =
+                        log_transaction(UserId::from(win.user_id), gid, win.net, "win", "roulette")
+                            .await
+                    {
+                        warn!("unable to log win transaction: {}", e);
+                    }
+                }
                 Err(e) => {
                     warn!("unable to add to balance");
                     warn!("{}", e);
                 }
+            }
+        } else if win.net < 0 {
+            if let Err(e) = log_transaction(
+                UserId::from(win.user_id),
+                gid,
+                win.net,
+                "loss",
+                "roulette",
+            )
+            .await
+            {
+                warn!("unable to log loss transaction: {}", e);
             }
         }
     }

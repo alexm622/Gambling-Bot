@@ -1,8 +1,11 @@
 use serenity::prelude::SerenityError;
 use serenity::{
     model::prelude::command::{Command, CommandOptionType},
+    model::prelude::GuildId,
     prelude::Context,
 };
+
+use crate::secrets;
 
 pub mod blackjack;
 pub mod money;
@@ -10,34 +13,68 @@ pub mod poker;
 pub mod roulette;
 pub mod slots;
 
+fn money_commands(commands: &mut serenity::builder::CreateApplicationCommands) {
+    commands
+        .create_application_command(|command| {
+            command
+                .name("bal")
+                .description("Get balance")
+                .create_option(|option| {
+                    option
+                        .name("user")
+                        .description("The user you want to get the balance of")
+                        .kind(CommandOptionType::User)
+                        .required(false)
+                })
+        })
+        .create_application_command(|command| {
+            command
+                .name("reset_bal")
+                .description("Reset your balance")
+        })
+        .create_application_command(|command| {
+            command
+                .name("reset_user_bal")
+                .description("Reset a user's balance")
+                .create_option(|option| {
+                    option
+                        .name("user")
+                        .description("The user you want to reset the balance of")
+                        .kind(CommandOptionType::User)
+                        .required(true)
+                })
+        })
+        .create_application_command(|command| {
+            command
+                .name("set_bal")
+                .description("Set a user's balance manually")
+                .create_option(|option| {
+                    option
+                        .name("user")
+                        .description("The user whose balance you want to set")
+                        .kind(CommandOptionType::User)
+                        .required(true)
+                })
+                .create_option(|option| {
+                    option
+                        .name("amount")
+                        .description("The new balance amount")
+                        .kind(CommandOptionType::Integer)
+                        .required(true)
+                })
+        });
+}
+
 //create commands using GuildID::set_application_commands
 pub async fn register_commands(
     ctx: &Context,
 ) -> Result<Vec<serenity::model::application::command::Command>, SerenityError> {
-    let commands = Command::set_global_application_commands(&ctx.http, |commands| {
+    let mut registered = Vec::new();
+
+    let global_commands = Command::set_global_application_commands(&ctx.http, |commands| {
         commands
             .create_application_command(|command| {
                 command.name("help").description("Get help with the bot")
-            })
-            //MONEY COMMANDS
-            //balance
-            .create_application_command(|command| {
-                command
-                    .name("bal")
-                    .description("Get balance")
-                    //optional command to get another user's balance
-                    .create_option(|option| {
-                        option
-                            .name("user")
-                            .description("The user you want to get the balance of")
-                            .kind(CommandOptionType::User)
-                            .required(false)
-                    })
-            })
-            //reset self balance
-            //this should have a confirmation message and a 5 minute timer
-            .create_application_command(|command| {
-                command.name("reset_bal").description("Reset your balance")
             })
             //
             //ROULETTE COMMANDS
@@ -128,25 +165,19 @@ pub async fn register_commands(
             .create_application_command(|command| {
                 command.name("pleave").description("Leave a game of poker")
             })
-            //MOD COMMANDS
-            //reset user balance
-            //this should have a confirmation message and a 5 minute timer
-            //limit to only users with the mod role
-            //can only effect users with a lower role than the mod
-            //user has to be in the server
-            .create_application_command(|command| {
-                command
-                    .name("reset_user_bal")
-                    .description("Reset a user's balance")
-                    .create_option(|option| {
-                        option
-                            .name("user")
-                            .description("The user you want to reset the balance of")
-                            .kind(CommandOptionType::User)
-                            .required(true)
-                    })
-            })
     })
-    .await;
-    commands
+    .await?;
+
+    registered.extend(global_commands);
+
+    if let Some(guild_id) = secrets::admin_server() {
+        let money = GuildId::set_application_commands(&guild_id, &ctx.http, |commands| {
+            money_commands(commands);
+            commands
+        })
+        .await?;
+        registered.extend(money);
+    }
+
+    Ok(registered)
 }

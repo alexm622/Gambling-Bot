@@ -16,7 +16,7 @@ use crate::{
     },
     errors::GenericError,
     redis::{decks::draw_card, users},
-    utils::deck::card_to_int,
+    utils::{deck::card_to_int, money::change_balance},
 };
 
 pub const LOBBY_SECONDS: u64 = 60;
@@ -163,7 +163,7 @@ async fn auto_start_game(ctx: &Context, gid: GuildId, cid: ChannelId) -> Result<
     if is_bot(sb_uid) {
         state.bot_balance = state.bot_balance.saturating_sub(state.small_blind);
     } else {
-        users::user_add(sb_uid, gid, -(state.small_blind as i64))
+        change_balance(sb_uid, gid, -(state.small_blind as i64), "bet", "poker")
             .await
             .map_err(|e| GenericError::new(&e.to_string()))?;
     }
@@ -172,7 +172,7 @@ async fn auto_start_game(ctx: &Context, gid: GuildId, cid: ChannelId) -> Result<
     if is_bot(bb_uid) {
         state.bot_balance = state.bot_balance.saturating_sub(state.big_blind);
     } else {
-        users::user_add(bb_uid, gid, -(state.big_blind as i64))
+        change_balance(bb_uid, gid, -(state.big_blind as i64), "bet", "poker")
             .await
             .map_err(|e| GenericError::new(&e.to_string()))?;
     }
@@ -470,7 +470,7 @@ async fn apply_check_call(
             return Err(GenericError::new(&"Not enough chips to call."));
         }
 
-        users::user_add(uid, gid, -(to_call as i64))
+        change_balance(uid, gid, -(to_call as i64), "bet", "poker")
             .await
             .map_err(|e| GenericError::new(&e.to_string()))?;
     }
@@ -536,7 +536,7 @@ async fn apply_raise(
             return Err(GenericError::new(&"Not enough chips to raise."));
         }
 
-        users::user_add(uid, gid, -(to_pay as i64))
+        change_balance(uid, gid, -(to_pay as i64), "bet", "poker")
             .await
             .map_err(|e| GenericError::new(&e.to_string()))?;
     }
@@ -601,7 +601,7 @@ async fn apply_all_in(
             return Err(GenericError::new(&"Not enough chips to go all in."));
         }
 
-        users::user_add(uid, gid, -bal)
+        change_balance(uid, gid, -bal, "bet", "poker")
             .await
             .map_err(|e| GenericError::new(&e.to_string()))?;
 
@@ -651,7 +651,7 @@ async fn run_showdown(ctx: &Context, gid: GuildId, cid: ChannelId) -> Result<(),
         if is_bot(winner) {
             state.bot_balance += pot;
         } else {
-            users::user_add(winner, gid, pot as i64)
+            change_balance(winner, gid, pot as i64, "win", "poker")
                 .await
                 .map_err(|e| GenericError::new(&e.to_string()))?;
         }
@@ -702,7 +702,7 @@ async fn run_showdown(ctx: &Context, gid: GuildId, cid: ChannelId) -> Result<(),
         if is_bot(winner) {
             state.bot_balance += amount;
         } else {
-            users::user_add(winner, gid, amount as i64)
+            change_balance(winner, gid, amount as i64, "win", "poker")
                 .await
                 .map_err(|e| GenericError::new(&e.to_string()))?;
         }

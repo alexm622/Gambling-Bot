@@ -121,7 +121,7 @@ mod tests {
         SpinResult {
             value,
             color: get_color(value),
-            oddness: value % 2 == 0,
+            oddness: value.is_multiple_of(2),
         }
     }
 
@@ -131,6 +131,8 @@ mod tests {
             net: amount,
             bet_type,
             specific_bet,
+            channel_id: 0,
+            guild_id: 0,
         }
     }
 
@@ -159,7 +161,7 @@ mod tests {
             let s = get_spin();
             assert!(s.value < 38);
             assert_eq!(s.color, get_color(s.value));
-            assert_eq!(s.oddness, s.value % 2 == 0);
+            assert_eq!(s.oddness, s.value.is_multiple_of(2));
         }
     }
 

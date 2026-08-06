@@ -3,6 +3,7 @@ pub mod cleanup;
 pub mod command_handler;
 pub mod component_handler;
 pub mod deck;
+pub mod money;
 pub mod roulette;
 
 //convert the gameid in to a name

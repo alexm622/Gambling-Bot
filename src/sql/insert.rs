@@ -1,21 +1,18 @@
 //insert into database
 
-use mysql_async::{params, prelude::Queryable, Pool};
+use mysql_async::{params, prelude::Queryable};
 
 use crate::{
     errors::GenericError,
     redis::users::{get_user_bal, set_bal},
+    sql::transactions::log_transaction,
 };
 
-use super::{get_db_link, statements, structs::RouletteBet};
+use super::{get_pool, statements, structs::RouletteBet};
 
 //insert a bet into roulette
 pub async fn insert_roulette_bet(bet: RouletteBet) -> Result<(), GenericError> {
-    let url = get_db_link().await;
-
-    let pool = Pool::new(url.as_str());
-
-    let mut conn = match pool.get_conn().await {
+    let mut conn = match get_pool().get_conn().await {
         Ok(v) => v,
         Err(e) => return Err(GenericError::new(&e.to_string().clone())),
     };
@@ -44,10 +41,16 @@ pub async fn insert_roulette_bet(bet: RouletteBet) -> Result<(), GenericError> {
         )
         .await
     {
-        Ok(_) => match set_bal(bet.user_id, bet.guild_id, new_balance).await {
-            Ok(_) => Ok(()),
-            Err(e) => return Err(GenericError::new(&e.to_string().clone())),
-        },
+        Ok(_) => {
+            match set_bal(bet.user_id, bet.guild_id, new_balance).await {
+                Ok(_) => Ok(()),
+                Err(e) => return Err(GenericError::new(&e.to_string().clone())),
+            }?;
+            log_transaction(bet.user_id, bet.guild_id, -bet.amount, "bet", "roulette")
+                .await
+                .map_err(|e| GenericError::new(&e.to_string()))?;
+            Ok(())
+        }
         Err(e) => return Err(GenericError::new(&e.to_string().clone())),
     };
     ret

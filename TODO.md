@@ -1,19 +1,19 @@
 # TODO
 
 ## Phase 1: Foundation
-- [ ] Shared SQL connection pool
+- [x] Shared SQL connection pool
   - Create one `Pool` in `sql::init_sql` and reuse it in all SQL modules
   - Replace per-call `Pool::new(...)` in `select.rs`, `insert.rs`, `delete.rs`
-- [ ] SQL read layer
+- [x] SQL read layer
   - Convert `select.rs` to parameterized queries
   - Add typed helpers for stats, transactions, and leaderboards
-- [ ] Transaction logging
+- [x] Transaction logging
   - Add `transactions` table: user_id, guild_id, amount, type, game, timestamp
   - Log every balance change (bet, win, loss, trade, daily)
-- [ ] Startup refund
+- [x] Startup refund
   - Refund all open roulette bets on boot
   - Clear stale poker/blackjack states and refund players
-- [ ] Money commands
+- [x] Money commands
   - register only these commands in the guild id listed in secrets.csv under `admin_server`
   - blacklist the commands only be usable by userid listed in secrets.csv under `admin_list` (this will be a comma-separated list of user ids)
   - Implement `reset_bal` with confirmation + 5-minute timer
